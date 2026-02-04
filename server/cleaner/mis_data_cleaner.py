@@ -17,7 +17,9 @@ from .cleaner_helper import (
     standardize_dataframe, 
     format_excel_sheet,
     clean_columns,
-    clean_address
+    clean_address,
+    create_styled_excel,
+    sync_addresses_to_t3
 )
 
 
@@ -77,20 +79,27 @@ def process_client_data(file_content):
         print(f"❌ Client Cleaner Error: {e}")
         return None, None, None
 
+import io
+import numpy as np
+import pandas as pd
+import traceback
+# IMPORT the helpers from the sibling file
+from .cleaner_helper import standardize_dataframe, create_styled_excel
+
 # ==========================================
 # 2. RAW DATA CLEANER
 # ==========================================
 def _clean_single_raw_df(df):
     try:
-
+        # Standardize NaN values
         df = df.replace({np.nan: None, "nan": None})
+        
         # Trip ID Logic
         df["Trip_ID"] = np.where(df.iloc[:, 10].astype(str).str.startswith("T"), df.iloc[:, 10], np.nan)
         df["Trip_ID"] = df["Trip_ID"].ffill()
 
         # Identify Row Types
         is_header = df.iloc[:, 1].astype(str).str.contains("UNITED FACILITIES", na=False)
-        # DEBUG: Relaxed regex slightly to ensure we catch rows even if there are formatting oddities
         is_passenger = df.iloc[:, 0].astype(str).str.match(r"^[0-9]+$") 
 
         # Extraction Maps
@@ -100,9 +109,8 @@ def _clean_single_raw_df(df):
         df_h = df[is_header].rename(columns=h_map)
         df_p = df[is_passenger].rename(columns=p_map)
         
-        # DEBUG CHECK
         if df_h.empty or df_p.empty:
-            print("DEBUG: Header or Passenger dataframe is empty. Check regex or file format.")
+            return pd.DataFrame()
 
         cols_h = [c for c in h_map.values() if c in df_h.columns] + ['Trip_ID']
         cols_p = [c for c in p_map.values() if c in df_p.columns] + ['Trip_ID']
@@ -110,10 +118,9 @@ def _clean_single_raw_df(df):
         merged = pd.merge(df_p[cols_p], df_h[cols_h], on='Trip_ID', how='left')
 
         # Cleaning Logic
-        for col in ['TRIP_ID', 'Trip_ID']:
-            if col in merged.columns:
-                merged[col] = merged[col].astype(str).str.replace('T', '', regex=False)
-                merged.rename(columns={col: 'TRIP_ID'}, inplace=True)
+        if 'Trip_ID' in merged.columns:
+            merged['TRIP_ID'] = merged['Trip_ID'].astype(str).str.replace('T', '', regex=False)
+            merged = merged.drop(columns=['Trip_ID'])
 
         if 'AGENCY_NAME' in merged.columns:
             merged['AGENCY_NAME'] = merged['AGENCY_NAME'].apply(lambda x: "UNITED FACILITIES" if "UNITED FACILITIES" in str(x).upper() else x)
@@ -130,40 +137,34 @@ def _clean_single_raw_df(df):
         cols_to_remove = ['PAX_NO', 'D_LOGIN', 'MARSHALL', 'DISTANCE', 'EMP_COUNT', 'TRIP_COUNT']
         merged = merged.drop(columns=cols_to_remove, errors='ignore')
 
+        # Clean string columns
         for col in merged.select_dtypes(include=['object']):
             merged[col] = merged[col].astype(str).str.upper().str.strip()
 
         return merged
     except Exception as e:
-        # DEBUG: Print actual error
         print(f"Error in _clean_single_raw_df: {e}")
-        traceback.print_exc()
         return pd.DataFrame()
 
 def process_raw_data(file_list_bytes):
     all_dfs = []
-    for filename, content in file_list_bytes: # Added filename to loop for better debug
+    for filename, content in file_list_bytes:
         try:
-            print(f"Processing file: {filename}") # DEBUG
-            df_raw = pd.read_excel(io.BytesIO(content), header=None,dtype=str).dropna(how="all").reset_index(drop=True)
+            print(f"Processing file: {filename}")
+            # Ensure we read as string to preserve IDs
+            df_raw = pd.read_excel(io.BytesIO(content), header=None, dtype=str).dropna(how="all").reset_index(drop=True)
             cleaned = _clean_single_raw_df(df_raw)
             if not cleaned.empty: 
                 all_dfs.append(cleaned)
-            else:
-                print(f"Warning: File {filename} resulted in empty data.")
         except Exception as e:
-            # DEBUG: Print actual error
             print(f"FAILED processing file {filename}: {e}")
-            traceback.print_exc()
-            pass
+            continue
 
     if not all_dfs: 
-        print("No valid dataframes found in any files.")
         return None, None, None
         
     final_df = pd.concat(all_dfs, ignore_index=True)
 
-    # Input Map -> DB Columns
     DB_MAP = {
         'TRIP_DATE': 'shift_date', 'TRIP_ID': 'trip_id', 'AGENCY_NAME': 'vendor', 
         'FLIGHT_NO.': 'flight_number', 'EMPLOYEE_ID': 'employee_id', 'EMPLOYEE_NAME': 'employee_name', 
@@ -175,33 +176,18 @@ def process_raw_data(file_list_bytes):
 
     final_db = final_df.rename(columns=DB_MAP).fillna("")
     
-    # 2. Date/Time Formatting
+    # Date/Time Formatting
     if 'shift_date' in final_db.columns:
         final_db['shift_date'] = pd.to_datetime(final_db['shift_date'], errors='coerce').dt.strftime('%d-%m-%Y')
-        final_db['trip_date'] = final_db['shift_date'] # Duplicate to trip_date
+        final_db['trip_date'] = final_db['shift_date']
     
     if 'shift_time' in final_db.columns:
+        # format='mixed' handles various Excel time strings
         final_db['shift_time'] = pd.to_datetime(final_db['shift_time'], errors='coerce', format='mixed').dt.strftime('%H:%M')
 
-    # 3. Standardize (Matches RawTripData Model)
-    # DEBUG: Wrapped in try/except in case this function is missing or failing
-    try:
-        final_db = standardize_dataframe(final_db)
-    except NameError:
-        print("CRITICAL: 'standardize_dataframe' function is not defined.")
-    except Exception as e:
-        print(f"Error in standardize_dataframe: {e}")
-        traceback.print_exc()
-        return None, None, None
-
-    if final_db is None: return None, None, None
-
-    # DEBUG: Wrapped in try/except
-    try:
-        return create_styled_excel(final_db, "Raw_Cleaned")
-    except NameError:
-        print("CRITICAL: 'create_styled_excel' function is not defined.")
-        return final_db, None, None
+    # 3. Final Step: Use imported helpers
+    final_db = standardize_dataframe(final_db)
+    return create_styled_excel(final_db, "Raw_Cleaned")
 
 
 # ==========================================

@@ -26,7 +26,7 @@ from ..models import User, ClientData, RawTripData, OperationData, TripData, T3A
 from ..cleaner.mis_data_cleaner import process_client_data, process_raw_data,process_ba_row_data
 from ..cleaner.fastag_data_cleaner import process_fastag_data
 from ..cleaner.cleaner_helper import create_styled_excel
-from ..cleaner.cleaner_helper import bulk_save_unique
+from ..cleaner.cleaner_helper import bulk_save_unique, sync_addresses_to_t3
 from ..cleaner.operation_data_cleaner import process_operation_app_data
 
 # 1. Setup paths relative to THIS file
@@ -122,15 +122,19 @@ async def clean_data(
             if df_result is not None:
                 new_addresses = sync_addresses_to_t3(session, df_result)
 
-            # 2. Save & Return (FIXED: Added this block)
+            # 2. Save & Return (Corrected for BytesIO pointer)
             if excel_output is None:
                 return Response("Error processing Raw data", status_code=400)
             
             generated_dir = GENERATED_DIR
-            os.makedirs(generated_dir, exist_ok=True)
+            generated_dir.mkdir(parents=True, exist_ok=True)
+            
             save_path = generated_dir / filename
+            
+            # Reset pointer and write buffer
+            excel_output.seek(0) 
             with open(save_path, "wb") as f:
-                f.write(excel_output.read())
+                f.write(excel_output.getbuffer()) # ✅ Best practice for BytesIO
 
             return {
                 "status": "success", 
