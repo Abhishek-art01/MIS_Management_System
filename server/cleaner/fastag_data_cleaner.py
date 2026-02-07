@@ -744,9 +744,15 @@ def process_fastag_data(file_data_list):
                     elif "indus.pdf" in fname_lower:
                         print(f"🔹 File '{filename}' -> Detected INDUS Logic")
                         df_temp = _process_indus(pdf)
+
+                    elif "sbi.pdf" in fname_lower:
+                        print(f"🔹 File '{filename}' -> Detected SBI Logic")
+                        df_temp = _process_sbi(pdf)
                     
                     else:
                         print(f"⚠️ File '{filename}' -> No Bank Name found. Defaulting to ICICI.")
+                        # Default fallback
+                        df_temp = _process_icici(pdf) 
                     
 
                     if df_temp is not None and not df_temp.empty:
@@ -764,9 +770,10 @@ def process_fastag_data(file_data_list):
         final_df = pd.concat(processed_dfs, ignore_index=True)
 
         # Enforce Columns
+        # Note: You asked to remove Plaza ID and rename Tag Dr/Cr -> Amount
         desired_columns = [
             "Vehicle No", "Travel Date Time", "Unique Transaction ID", 
-            "Activity", "Plaza Name", "Plaza ID", "Tag Dr/Cr"
+            "Activity", "Plaza Name", "Tag Dr/Cr" 
         ]
 
         for col in desired_columns:
@@ -775,11 +782,44 @@ def process_fastag_data(file_data_list):
 
         final_df = final_df[desired_columns]
 
-        # General Cleaning (Safety check)
+        # --- 1. CLEAN TRANSACTION ID (TRIM + REMOVE NEWLINES) ---
+        # Excel Equiv: =TRIM(SUBSTITUTE(E17,CHAR(10),""))
+        if "Unique Transaction ID" in final_df.columns:
+            final_df["Unique Transaction ID"] = (
+                final_df["Unique Transaction ID"]
+                .astype(str)
+                .str.replace("\n", "", regex=False) # Remove Char(10)
+                .str.replace(" ", "", regex=False)  # Remove spaces (usually IDs don't have spaces)
+                .str.strip()
+            )
+            
+            # Remove rows where Transaction ID is empty, nan, or 'nan' string
+            final_df = final_df[
+                (final_df["Unique Transaction ID"] != "") & 
+                (final_df["Unique Transaction ID"].str.lower() != "nan")
+            ]
+
+        # --- 2. CLEAN DATE (DATEVALUE + TIMEVALUE) ---
+        # We convert to native Pandas Datetime objects. 
+        # When exported to Excel, these become proper sortable dates.
         if "Travel Date Time" in final_df.columns:
+            # First clean junk text
             mask = final_df["Travel Date Time"].astype(str).str.lower().str.contains("date|total|page", na=False)
             final_df = final_df[~mask]
 
+            # Convert to Datetime
+            # 'dayfirst=True' handles DD-MM-YYYY vs MM-DD-YYYY ambiguity
+            final_df["Travel Date Time"] = pd.to_datetime(
+                final_df["Travel Date Time"], 
+                dayfirst=True, 
+                errors='coerce'
+            )
+            
+            # Format as String if you prefer specific look, OR keep as Obj for Excel to handle
+            # Let's keep it as a clean string format that Excel recognizes easily
+            final_df["Travel Date Time"] = final_df["Travel Date Time"].dt.strftime('%d-%m-%Y %H:%M:%S')
+
+        # --- 3. CLEAN VEHICLE NO ---
         final_df["Vehicle No"] = (
             final_df["Vehicle No"].astype(str)
             .str.replace(" ", "", regex=False)
@@ -789,15 +829,23 @@ def process_fastag_data(file_data_list):
             .replace("NONE", "")
         )
 
+        # --- 4. CLEAN AMOUNT ---
         final_df["Tag Dr/Cr"] = pd.to_numeric(
             final_df["Tag Dr/Cr"].astype(str).str.replace(",", ""), errors='coerce'
         ).fillna(0)
+
+        # --- 5. RENAME COLUMNS (Final Polish) ---
+        # Renaming 'Tag Dr/Cr' to 'Amount'
+        final_df = final_df.rename(columns={"Tag Dr/Cr": "Amount"})
 
         final_df = final_df.fillna("")
 
         print(f"🔹 Processing complete. Final shape: {final_df.shape}")
         
-        from .cleaner_helper import create_styled_excel
+        # Use existing excel creator
+        # Ensure create_styled_excel doesn't force column renames back if it uses MANDATORY_DB_MAP
+        # Since this is "Fastag", we usually pass a custom filename.
+        from .cleaner import create_styled_excel 
         return create_styled_excel(final_df, "Fastag_Cleaned")
 
     except Exception as e:

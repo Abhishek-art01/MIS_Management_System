@@ -306,28 +306,36 @@ def get_xls_style_data(book, xf_index, row_idx, col_idx):
 def create_styled_excel(df, filename_prefix="Cleaned"):
     """ Generates Excel with consistent formatting. """
     output = io.BytesIO()
-    mandatory_columns = get_mandatory_columns()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        # Invert map to get Friendly Headers
-        df_export = df.copy()
         
-        # Order: Mandatory Headers -> Extra Headers
-        export_cols = [h for h in mandatory_columns if h in df_export.columns]
-        remaining = [c for c in df_export.columns if c not in mandatory_columns and c != 'unique_id']
-        export_cols += remaining
-        
-        df_export = df_export[export_cols]
-        
-        df_export.to_excel(writer, index=False, sheet_name='Raw_Data')
+        # Check if this is likely Fastag Data (has 'Amount' or 'Plaza Name')
+        is_fastag = 'Amount' in df.columns or 'Plaza Name' in df.columns
+
+        if not is_fastag:
+            # Use strict mapping for Client/Raw data
+            inv_map = {v: k for k, v in MANDATORY_DB_MAP.items()}
+            df_export = df.rename(columns=inv_map)
+            
+            # Order columns logic...
+            export_cols = [h for h in MANDATORY_HEADERS if h in df_export.columns]
+            remaining = [c for c in df_export.columns if c not in MANDATORY_HEADERS and c != 'unique_id']
+            export_cols += remaining
+            df_export = df_export[export_cols]
+        else:
+            # For Fastag, just export as is (we already cleaned it)
+            df_export = df
+
+        df_export.to_excel(writer, index=False, sheet_name='Data')
         
         # Apply Styles
         workbook = writer.book
-        worksheet = writer.sheets['Raw_Data']
+        worksheet = writer.sheets['Data']
         header_fmt = workbook.add_format({'bold': True, 'bg_color': '#0070C0', 'font_color': 'white'})
         
         for i, col in enumerate(df_export.columns):
             worksheet.write(0, i, col, header_fmt)
-            worksheet.set_column(i, i, 15)
+            # Auto-adjust width roughly
+            worksheet.set_column(i, i, 20)
             
     output.seek(0)
     return df, output, f"{filename_prefix}.xlsx"
