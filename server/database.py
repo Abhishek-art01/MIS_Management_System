@@ -1,7 +1,7 @@
 import json
 from typing import Generator
 from sqlmodel import SQLModel, create_engine, Session
-
+import pandas as pd
 import os
 import json
 from sqlmodel import SQLModel, create_engine, Session
@@ -52,3 +52,52 @@ def get_session() -> Generator[Session, None, None]:
     """
     with Session(engine) as session:
         yield session
+
+# In server/database.py
+
+def bulk_save_client_data(df: pd.DataFrame):
+    try:
+        # 1. Validate DataFrame is not empty
+        if df.empty:
+            return {"status": "skipped", "message": "No data to save"}
+
+        # 2. 🔥 THE FIX IS HERE: Select the column, then call unique()
+        if "unique_id" not in df.columns:
+            print("❌ Error: 'unique_id' column missing in DataFrame")
+            return
+
+        # Get list of unique_ids from the *DataFrame*
+        new_ids = df["unique_id"].unique().tolist()
+
+        with Session(engine) as session:
+            # 3. Find which IDs already exist in DB to avoid duplicates
+            statement = select(ClientData.unique_id).where(ClientData.unique_id.in_(new_ids))
+            existing_ids = session.exec(statement).all()
+            existing_set = set(existing_ids)
+
+            # 4. Filter out existing records
+            # We keep rows where unique_id is NOT in the database
+            df_to_save = df[~df["unique_id"].isin(existing_set)]
+
+            if df_to_save.empty:
+                print("🔹 No new records to save.")
+                return {"status": "success", "new_records": 0}
+
+            # 5. Convert to Objects and Bulk Insert
+            # to_dict('records') converts DF to list of dicts: [{'col': val}, ...]
+            records = df_to_save.to_dict(orient='records')
+            
+            # Map dicts to the SQLModel class
+            db_objects = [ClientData(**row) for row in records]
+
+            session.add_all(db_objects)
+            session.commit()
+            
+            count = len(db_objects)
+            print(f"✅ Successfully saved {count} new Client Data records.")
+            return {"status": "success", "new_records": count}
+
+    except Exception as e:
+        print(f"❌ Database Error in bulk_save_client_data: {e}")
+        # Re-raise so the server logs the full traceback
+        raise e

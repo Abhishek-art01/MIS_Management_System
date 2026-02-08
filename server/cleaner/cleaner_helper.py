@@ -303,31 +303,52 @@ def get_xls_style_data(book, xf_index, row_idx, col_idx):
         return None, None, False    
 
 
+# ==========================================
+# EXCEL GENERATOR HELPER
+# ==========================================
 def create_styled_excel(df, filename_prefix="Cleaned"):
     """ Generates Excel with consistent formatting. """
     output = io.BytesIO()
+    
+    # 1. Fetch Mapping dynamically
+    try:
+        # Assuming get_mandatory_columns returns {Friendly: DB_Col}
+        mandatory_map = get_mandatory_columns() 
+        mandatory_headers_list = list(mandatory_map.keys())
+    except:
+        mandatory_map = {}
+        mandatory_headers_list = []
+
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         
-        # Check if this is likely Fastag Data (has 'Amount' or 'Plaza Name')
+        # 2. Check Data Type
+        # Fastag data has 'Amount' or 'Plaza Name'. 
+        # Standard data uses the mandatory map.
         is_fastag = 'Amount' in df.columns or 'Plaza Name' in df.columns
 
-        if not is_fastag:
-            # Use strict mapping for Client/Raw data
-            inv_map = {v: k for k, v in MANDATORY_DB_MAP.items()}
+        if not is_fastag and mandatory_map:
+            # --- STANDARD CLIENT/RAW DATA LOGIC ---
+            # Create Inverse Map: DB_Col (snake_case) -> Friendly Name
+            inv_map = {v: k for k, v in mandatory_map.items()}
+            
+            # Rename columns to Friendly Names
             df_export = df.rename(columns=inv_map)
             
-            # Order columns logic...
-            export_cols = [h for h in MANDATORY_HEADERS if h in df_export.columns]
-            remaining = [c for c in df_export.columns if c not in MANDATORY_HEADERS and c != 'unique_id']
+            # Reorder Columns: Mandatory First -> Then Others
+            export_cols = [h for h in mandatory_headers_list if h in df_export.columns]
+            remaining = [c for c in df_export.columns if c not in mandatory_headers_list and c != 'unique_id']
             export_cols += remaining
+            
             df_export = df_export[export_cols]
         else:
-            # For Fastag, just export as is (we already cleaned it)
+            # --- FASTAG / GENERIC LOGIC ---
+            # Export as is (we already cleaned it in the specific function)
             df_export = df
 
+        # 3. Write Data
         df_export.to_excel(writer, index=False, sheet_name='Data')
         
-        # Apply Styles
+        # 4. Apply Styles
         workbook = writer.book
         worksheet = writer.sheets['Data']
         header_fmt = workbook.add_format({'bold': True, 'bg_color': '#0070C0', 'font_color': 'white'})
@@ -340,38 +361,60 @@ def create_styled_excel(df, filename_prefix="Cleaned"):
     output.seek(0)
     return df, output, f"{filename_prefix}.xlsx"
 
+# ==========================================
+# DATABASE HELPER: BULK SAVE
+# ==========================================
 def bulk_save_unique(session, model, df):
     """
     Saves rows to the database only if the unique_id doesn't already exist.
+    Handles duplicate columns automatically.
     """
     if df is None or df.empty:
         return 0
 
     try:
-        # ✅ FIX: Use df['unique_id'].unique() instead of df.unique()
-        incoming_ids = df['unique_id'].unique().tolist()
+        # 🔥 FIX: Deduplicate columns first.
+        # If 'unique_id' appears twice, df['unique_id'] returns a DataFrame (causing the crash).
+        # This line keeps only the first occurrence of every column name.
+        df = df.loc[:, ~df.columns.duplicated()]
 
-        # Check which IDs already exist in the database
+        if "unique_id" not in df.columns:
+            print(f"❌ Error: 'unique_id' missing in {model.__tablename__} data.")
+            return 0
+
+        # Now safe to call unique() because we know it's a Series
+        incoming_ids = df["unique_id"].astype(str).unique().tolist()
+
+        # Check existing IDs in DB
         from sqlmodel import select
-        existing_ids_query = session.exec(select(model.unique_id).where(model.unique_id.in_(incoming_ids))).all()
-        existing_ids = set(existing_ids_query)
+        statement = select(model.unique_id).where(model.unique_id.in_(incoming_ids))
+        existing_db_ids = session.exec(statement).all()
+        existing_set = set(existing_db_ids)
 
-        # Filter out rows that are already in the DB
-        new_data = df[~df['unique_id'].isin(existing_ids)]
+        # Filter: Keep rows NOT in DB
+        new_data = df[~df['unique_id'].isin(existing_set)]
 
         if not new_data.empty:
-            # Convert filtered dataframe to list of model objects
-            objects = [model(**row) for row in new_data.to_dict(orient='records')]
+            records = new_data.to_dict(orient='records')
+            # Create objects safely
+            objects = [model(**row) for row in records]
+            
             session.add_all(objects)
             session.commit()
-            return len(objects)
+            
+            count = len(objects)
+            print(f"✅ Saved {count} new records to {model.__tablename__}")
+            return count
         
-        return 0
-    except Exception as e:
-        session.rollback()
-        print(f"Database Error in bulk_save_unique: {e}")
+        print("🔹 No new records to save.")
         return 0
 
+    except Exception as e:
+        session.rollback()
+        print(f"❌ Database Error in bulk_save_unique: {e}")
+        import traceback
+        traceback.print_exc()
+        return 0
 def sync_addresses_to_t3(session, df):
     """
     Extracts unique addresses from the processed data and syncs them to the T3 table.

@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from .cleaner_helper import (
     get_mandatory_columns, 
     get_xls_style_data, 
-    standardize_dataframe, 
+    standardize_dataframe,
     format_excel_sheet,
     clean_columns,
     clean_address
@@ -30,7 +30,7 @@ def process_operation_app_data(file_list_bytes):
     # 1. Configuration
     COLUMN_TO_RENAME = {
         'DATE': 'shift_date', 'TRIP ID': 'trip_id', 'FLT NO.': 'flight_number', 
-        'SAP ID': 'employee_id', 'EMP NAME': 'employee_name', 'EMPLOYEE ADDRESS': 'employee_address', 
+        'SAP ID': 'employee_id', 'EMP NAME': 'employee_name', 'EMPLOYEE ADDRESS': 'address', 
         'PICKUP LOCATION': 'landmark', 'DROP LOCATION': 'office', 'CAB NO': 'cab_last_digit',
         'PICKUP TIME': 'pickup_time', 'REMARKS': 'mis_remark'
     }
@@ -238,21 +238,15 @@ def process_operation_app_data(file_list_bytes):
                 cell.alignment = align_center
                 cell.border = border
 
-        
+        # Headers to upper case
         # --- 3. THE CLEANING BLOCK (FIXED) ---
+        # Convert all column names to UPPERCASE first
         df_db.columns = df_db.columns.str.strip().str.upper()
-
-        numeric_cols = ["TRIP_ID", "EMPLOYEE_ID", "CAB_LAST_DIGIT"]
-        for col in numeric_cols:
-            if col in df_db.columns:
-                df_db[col] = pd.to_numeric(df_db[col], errors="coerce")
 
         if "EMPLOYEE_ADDRESS" in df_db.columns:
             df_db["EMPLOYEE_ADDRESS"] = (
                 df_db["EMPLOYEE_ADDRESS"]
                 .astype(str)
-                .str.replace(r"[- , /]", " ", regex=True) # Combined regex for speed
-                .str.replace(r"\s+", " ", regex=True)
                 .str.strip()
                 .str.upper()
             )

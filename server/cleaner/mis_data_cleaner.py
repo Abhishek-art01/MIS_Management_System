@@ -4,6 +4,7 @@ import pdfplumber
 import io
 import re
 import xlrd
+import hashlib
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 import traceback
@@ -24,67 +25,130 @@ from .cleaner_helper import (
 
 
 # ==========================================
-# 1. CLIENT DATA CLEANER
+# 1. CLIENT DATA CLEANER (No DB Upload)
 # ==========================================
 def process_client_data(file_content):
+    """
+    Cleans Client Data (CSV/Excel) and returns a formatted Excel file.
+    Does NOT save to the database.
+    """
     try:
-        # Columns to Remove based on your request
+        # 1. Define Columns to Drop
         DROP_COLS = [
-            'Bunit ID', 'Cycle Start', 'Cycle End', 'Billing Period', 'Project', 'Cost Center', 
+            'Bunit ID', 'Cycle Start', 'Cycle End', 'Shift Date', 'Project', 'Cost Center', 
             'Department', 'Planned Emp Count', 'Travelled Emp Count', 'Billable Emp Count', 
-            'No Show', 'Planned Escort', 'Actual Escort', 'Emp Km', 'Trip Cost', 
+            'No Show', 'Planned Escort', 'Actual Escort', 'Emp km', 'Trip Cost', 
             'Trip AC Cost', 'Per Emp Cost', 'Escort Cost', 'Penalty', 'Vendor Penalty', 
             'Total Cost', 'Assigned Contract', 'Cab Contract', 'Billing Zone', 
             'Trip Billing Zone', 'Emp Sigin Type', 'Escort ID', 'Toll Cost', 
-            'State Tax Cost', 'Parking Or Toll Cost', 'Per Employee Overhead Cost', 
+            'State Tax Co   st', 'Parking Or Toll Cost', 'Per Employee Overhead Cost', 
             'Trip Source', 'Extra Kms Based On Billable Employee Count', 'Billing Kms', 
             'Actual Kms At Employee Level', 'Grid Km', 'Employee Adjustment Distance', 
-            'Trip Adjustment', 'Total Distance'
+            'Trip Adjustment', 'Total Distance', 'State Tax Cost', 'Flight Category', 
+            'Flight Route', 'Flight Type', 'Cab Type', 'Airport Name'
         ]
 
-        # Input Mapping
-        COL_MAP = {
-            "Shift Date": "shift_date", "Trip ID": "trip_id", "Employee ID": "employee_id", 
-            "Gender": "gender", "Employee Name": "employee_name", "Shift Time": "shift_time", 
-            "Pickup Time": "pickup_time", "Drop Time": "drop_time", "Trip Direction": "trip_direction", 
-            "Cab Reg No": "cab_reg_no", "Cab Type": "cab_type", "Vendor": "vendor", 
-            "Office": "office", "Airport Name": "airport_name", "Landmark": "landmark", 
-            "Address": "address", "Flight Number": "flight_number", "Flight Category": "flight_category", 
-            "Flight Route": "flight_route", "Flight Type": "flight_type"
+        # 2. Define Mapping (CSV Headers -> DB Headers)
+        COLUMN_MAPPING = {
+            "Trip ID": "trip_id",
+            "Billing period": "shift_date", 
+            "Employee ID": "employee_id",
+            "Gender": "gender",
+            "Employee Name": "employee_name",
+            "Shift Time": "shift_time",
+            "Pickup Time": "pickup_time",
+            "Drop time": "drop_time",
+            "Trip direction": "trip_direction",
+            "Cab reg no": "cab_reg_no",
+            "Vendor": "vendor",
+            "Office": "office",
+            "Landmark": "landmark",
+            "Address": "address",
+            "Flight Number": "flight_number",
         }
-        
-        df = pd.read_excel(io.BytesIO(file_content), dtype=str)
-        
-        # 1. Drop Unwanted
+
+        # 3. Read File (Try CSV, fallback to Excel)
+        try:
+            df = pd.read_csv(io.BytesIO(file_content))
+            print("🔹 Processed as CSV")
+        except:
+            try:
+                df = pd.read_excel(io.BytesIO(file_content), dtype=str)
+                print("🔹 Processed as Excel")
+            except Exception as e:
+                print(f"❌ Error reading file: {e}")
+                return None, None, None
+
+        # 4. Drop & Rename
         df = df.drop(columns=[c for c in DROP_COLS if c in df.columns], errors='ignore')
+        df = df.rename(columns=COLUMN_MAPPING)
 
-        # 2. Data Cleaning
-        if "Cab Reg No" in df.columns:
-            df["Cab Reg No"] = df["Cab Reg No"].str.replace("-", "", regex=False).str.upper()
-
-        if "Trip Direction" in df.columns:
-            df["Trip Direction"] = df["Trip Direction"].astype(str).str.strip().str.title().replace({
-                "Login": "Pickup", "Logout": "Drop"
-            })
-
-        # 3. Rename to DB Columns
-        df_db = df.rename(columns=COL_MAP).fillna("")
+        # 5. Add Missing Mandatory Headers (Dynamic from Helper)
+        mandatory_cols = get_mandatory_columns()
         
-        # 4. Standardize (Matches ClientData Model)
-        df_db = standardize_dataframe(df_db)
-        if df_db is None: return None, None, None
+        # Handle if helper returns Dict or List
+        if isinstance(mandatory_cols, dict):
+            target_cols = mandatory_cols.values()
+        else:
+            target_cols = mandatory_cols 
 
+        for db_col in target_cols:
+            if db_col not in df.columns:
+                df[db_col] = "" # Fill missing columns with empty string
+
+        # 6. Cleaning Logic
+        # Clean Cab Reg No
+        if "cab_reg_no" in df.columns:
+            df["cab_reg_no"] = (
+                df["cab_reg_no"]
+                .astype(str)
+                .str.replace("-", "", regex=False)
+                .str.replace(" ", "", regex=False)
+                .str.upper()
+                .replace("NAN", "")
+            )
+
+        # Clean Trip Direction
+        if "trip_direction" in df.columns:
+            df["trip_direction"] = (
+                df["trip_direction"]
+                .astype(str)
+                .str.strip()
+                .str.title()
+                .replace({"Login": "Pickup", "Logout": "Drop"})
+            )
+
+        # 7. Generate Unique ID (MD5 Hash)
+        def generate_unique_id(row):
+            t_id = str(row.get('trip_id', '')).strip()
+            e_id = str(row.get('employee_id', '')).strip()
+            s_date = str(row.get('shift_date', '')).strip()
+            
+            if t_id.lower() == 'nan': t_id = ''
+            if e_id.lower() == 'nan': e_id = ''
+            if s_date.lower() == 'nan': s_date = ''
+
+            base = f"{t_id}_{e_id}_{s_date}"
+            return hashlib.md5(base.encode()).hexdigest()
+
+        df["unique_id"] = df.apply(generate_unique_id, axis=1)
+        df["data_source"] = "CLIENT"
+
+        # 8. Standardize & Export
+        # Note: We are returning the Excel file directly. 
+        # We are NOT calling 'bulk_save_unique' or any DB function here.
+        df_db = standardize_dataframe(df)
+        
+        if df_db is None: 
+            return None, None, None
+
+        print(f"✅ Cleaning Complete. Returning Excel with {len(df_db)} rows.")
         return create_styled_excel(df_db, "Client_Cleaned")
+
     except Exception as e:
         print(f"❌ Client Cleaner Error: {e}")
+        traceback.print_exc()
         return None, None, None
-
-import io
-import numpy as np
-import pandas as pd
-import traceback
-# IMPORT the helpers from the sibling file
-from .cleaner_helper import standardize_dataframe, create_styled_excel
 
 # ==========================================
 # 2. RAW DATA CLEANER

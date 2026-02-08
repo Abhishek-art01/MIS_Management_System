@@ -73,20 +73,20 @@ async def clean_data(
             content = await files[0].read()
             df_result, excel_output, filename = process_client_data(content)
             
-            # 1. Database Logic
-            rows_saved = bulk_save_unique(session, ClientData, df_result)
-            if df_result is not None:
-                new_addresses = sync_addresses_to_t3(session, df_result)
+            # # 1. Database Logic
+            # rows_saved = bulk_save_unique(session, ClientData, df_result)
+            # if df_result is not None:
+            #     new_addresses = sync_addresses_to_t3(session, df_result)
             
-            # 2. Sync Unique IDs (Custom Logic)
-            if df_result is not None and not df_result.empty and "unique_id" in df_result.columns:
-                incoming_ids = df_result["unique_id"].dropna().unique().tolist()
-                existing_ids = set(session.exec(select(ClientData.unique_id).where(col(ClientData.unique_id).in_(incoming_ids))).all())
-                new_rows = df_result[~df_result["unique_id"].isin(existing_ids)]
-                if not new_rows.empty:
-                    records = [ClientData(**row.to_dict()) for _, row in new_rows.iterrows()]
-                    session.add_all(records)
-                    session.commit()
+            # # 2. Sync Unique IDs (Custom Logic)
+            # if df_result is not None and not df_result.empty and "unique_id" in df_result.columns:
+            #     incoming_ids = df_result["unique_id"].dropna().unique().tolist()
+            #     existing_ids = set(session.exec(select(ClientData.unique_id).where(col(ClientData.unique_id).in_(incoming_ids))).all())
+            #     new_rows = df_result[~df_result["unique_id"].isin(existing_ids)]
+            #     if not new_rows.empty:
+            #         records = [ClientData(**row.to_dict()) for _, row in new_rows.iterrows()]
+            #         session.add_all(records)
+            #         session.commit()
 
             # 3. Save & Return (FIXED: Added this block)
             if excel_output is None:
