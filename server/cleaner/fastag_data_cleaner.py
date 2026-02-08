@@ -7,6 +7,7 @@ import xlrd
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 import traceback
+from .cleaner_helper import create_styled_excel
 
 # ==========================================
 # HELPER: ICICI SPECIFIC CLEANER
@@ -711,7 +712,11 @@ def _process_indus(pdf_obj):
 
     return df
 # ==========================================
-# 4. MAIN FASTAG DATA CLEANER (PDF)
+# HELPER: SBI SPECIFIC CLEANER (Fixed Date Join)
+# ==========================================
+
+# ==========================================
+# 4. MAIN FASTAG DATA CLEANER (PDF) - UPDATED
 # ==========================================
 def process_fastag_data(file_data_list):
     """
@@ -745,13 +750,12 @@ def process_fastag_data(file_data_list):
                         print(f"🔹 File '{filename}' -> Detected INDUS Logic")
                         df_temp = _process_indus(pdf)
 
-                    elif "sbi.pdf" in fname_lower:
+                    elif "sbi.pdf" in fname_lower: # <--- Added SBI
                         print(f"🔹 File '{filename}' -> Detected SBI Logic")
                         df_temp = _process_sbi(pdf)
                     
                     else:
                         print(f"⚠️ File '{filename}' -> No Bank Name found. Defaulting to ICICI.")
-                        # Default fallback
                         df_temp = _process_icici(pdf) 
                     
 
@@ -762,15 +766,24 @@ def process_fastag_data(file_data_list):
                 print(f"⚠️ Error reading file {filename}: {e}")
                 continue
 
+        
         if not processed_dfs:
             print("❌ No valid data extracted.")
             return None, None, None
 
+        # 🔥 FIX: Ensure no duplicate columns in any DF before concat
+        cleaned_dfs = []
+        for d in processed_dfs:
+            # Remove duplicate columns
+            d = d.loc[:, ~d.columns.duplicated()]
+            # Ensure index is unique
+            d = d.reset_index(drop=True)
+            cleaned_dfs.append(d)
+
         # Merge
-        final_df = pd.concat(processed_dfs, ignore_index=True)
+        final_df = pd.concat(cleaned_dfs, ignore_index=True)
 
         # Enforce Columns
-        # Note: You asked to remove Plaza ID and rename Tag Dr/Cr -> Amount
         desired_columns = [
             "Vehicle No", "Travel Date Time", "Unique Transaction ID", 
             "Activity", "Plaza Name", "Tag Dr/Cr" 
@@ -783,40 +796,39 @@ def process_fastag_data(file_data_list):
         final_df = final_df[desired_columns]
 
         # --- 1. CLEAN TRANSACTION ID (TRIM + REMOVE NEWLINES) ---
-        # Excel Equiv: =TRIM(SUBSTITUTE(E17,CHAR(10),""))
         if "Unique Transaction ID" in final_df.columns:
             final_df["Unique Transaction ID"] = (
                 final_df["Unique Transaction ID"]
                 .astype(str)
-                .str.replace("\n", "", regex=False) # Remove Char(10)
-                .str.replace(" ", "", regex=False)  # Remove spaces (usually IDs don't have spaces)
+                .str.replace("\n", "", regex=False)
+                .str.replace(" ", "", regex=False)
                 .str.strip()
             )
             
-            # Remove rows where Transaction ID is empty, nan, or 'nan' string
+            # Remove rows where Transaction ID is empty/nan
             final_df = final_df[
                 (final_df["Unique Transaction ID"] != "") & 
                 (final_df["Unique Transaction ID"].str.lower() != "nan")
             ]
 
-        # --- 2. CLEAN DATE (DATEVALUE + TIMEVALUE) ---
-        # We convert to native Pandas Datetime objects. 
-        # When exported to Excel, these become proper sortable dates.
+        # --- 2. CLEAN DATE (Format: 03/02/2026 & Standard) ---
         if "Travel Date Time" in final_df.columns:
-            # First clean junk text
+            # Clean junk text
             mask = final_df["Travel Date Time"].astype(str).str.lower().str.contains("date|total|page", na=False)
             final_df = final_df[~mask]
 
+            # 🔥 FIX: Handle slash dates (03/02/2026) by replacing / with -
+            # This helps pandas parser recognize them correctly as dates
+            final_df["Travel Date Time"] = final_df["Travel Date Time"].astype(str).str.replace("/", "-", regex=False)
+
             # Convert to Datetime
-            # 'dayfirst=True' handles DD-MM-YYYY vs MM-DD-YYYY ambiguity
             final_df["Travel Date Time"] = pd.to_datetime(
                 final_df["Travel Date Time"], 
                 dayfirst=True, 
                 errors='coerce'
             )
             
-            # Format as String if you prefer specific look, OR keep as Obj for Excel to handle
-            # Let's keep it as a clean string format that Excel recognizes easily
+            # Format consistently
             final_df["Travel Date Time"] = final_df["Travel Date Time"].dt.strftime('%d-%m-%Y %H:%M:%S')
 
         # --- 3. CLEAN VEHICLE NO ---
@@ -829,23 +841,20 @@ def process_fastag_data(file_data_list):
             .replace("NONE", "")
         )
 
-        # --- 4. CLEAN AMOUNT ---
-        final_df["Tag Dr/Cr"] = pd.to_numeric(
-            final_df["Tag Dr/Cr"].astype(str).str.replace(",", ""), errors='coerce'
+        # --- 4. CLEAN AMOUNT (Fix Negatives) ---
+        final_df = final_df.rename(columns={"Tag Dr/Cr": "Amount"})
+
+        final_df["Amount"] = pd.to_numeric(
+            final_df["Amount"].astype(str).str.replace(",", ""), errors='coerce'
         ).fillna(0)
 
-        # --- 5. RENAME COLUMNS (Final Polish) ---
-        # Renaming 'Tag Dr/Cr' to 'Amount'
-        final_df = final_df.rename(columns={"Tag Dr/Cr": "Amount"})
+        # Convert to Absolute Value
+        final_df["Amount"] = final_df["Amount"].abs()
 
         final_df = final_df.fillna("")
 
         print(f"🔹 Processing complete. Final shape: {final_df.shape}")
         
-        # Use existing excel creator
-        # Ensure create_styled_excel doesn't force column renames back if it uses MANDATORY_DB_MAP
-        # Since this is "Fastag", we usually pass a custom filename.
-        from .cleaner import create_styled_excel 
         return create_styled_excel(final_df, "Fastag_Cleaned")
 
     except Exception as e:
