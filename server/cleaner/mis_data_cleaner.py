@@ -122,13 +122,11 @@ def process_client_data(file_content):
         def generate_unique_id(row):
             t_id = str(row.get('trip_id', '')).strip()
             e_id = str(row.get('employee_id', '')).strip()
-            s_date = str(row.get('shift_date', '')).strip()
             
             if t_id.lower() == 'nan': t_id = ''
             if e_id.lower() == 'nan': e_id = ''
-            if s_date.lower() == 'nan': s_date = ''
 
-            base = f"{t_id}_{e_id}_{s_date}"
+            base = f"{t_id}_{e_id}"
             return hashlib.md5(base.encode()).hexdigest()
 
         df["unique_id"] = df.apply(generate_unique_id, axis=1)
@@ -137,7 +135,7 @@ def process_client_data(file_content):
         # 8. Standardize & Export
         # Note: We are returning the Excel file directly. 
         # We are NOT calling 'bulk_save_unique' or any DB function here.
-        df_db = standardize_dataframe(df)
+        df_db = format_excel_sheet(df)
         
         if df_db is None: 
             return None, None, None

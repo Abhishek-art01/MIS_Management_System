@@ -213,49 +213,7 @@ def format_excel_sheet(ws):
 
 
 def standardize_dataframe(df):
-    """
-    Standardizes DataFrame to match SQLModel definitions:
-    1. Generates 'unique_id' (Composite Key).
-    2. Ensures ALL mapped columns exist (fills missing with "").
-    3. Returns DataFrame with [Mandatory Columns] + [Any Extra Columns].
-    """
-    if df is None or df.empty:
-        return None
-
-    # Work on a copy to avoid SettingWithCopyWarning
-    df = df.copy()
-
-    # 1. Generate Unique ID
-    if 'trip_id' in df.columns and 'employee_id' in df.columns:
-        df['unique_id'] = df['trip_id'].astype(str).str.strip() + df['employee_id'].astype(str).str.strip()
-        # Filter rows with missing or string 'nan' IDs
-        df = df[
-            df["unique_id"].notna() & 
-            (df["unique_id"] != "") & 
-            (~df["unique_id"].str.contains("nan|None", case=False))
-        ]
-    else:
-        # If we can't make a unique_id, we can't sync to DB
-        return None 
-
-    # 2. Sync Columns with SQLModel (Fill Missing)
-    target_cols = get_mandatory_columns()
-    for col in target_cols:
-        if col not in df.columns:
-            df[col] = ""
-
-    # 3. Populate specific logic columns
-    df['una2'] = df['unique_id'] 
-
-    # 4. Organize Columns: Mandatory -> Extra -> unique_id
-    current_cols = df.columns.tolist()
-    reserved_cols = set(target_cols) | {'unique_id'}
-    extra_cols = [c for c in current_cols if c not in reserved_cols]
-    
-    # Ensure we only try to select columns that actually exist
-    final_order = [c for c in (target_cols + extra_cols + ['unique_id']) if c in df.columns]
-    
-    return df[final_order]
+    return df
 
 def get_xls_style_data(book, xf_index, row_idx, col_idx):
     """
