@@ -135,7 +135,7 @@ def process_client_data(file_content):
         # 8. Standardize & Export
         # Note: We are returning the Excel file directly. 
         # We are NOT calling 'bulk_save_unique' or any DB function here.
-        df_db = format_excel_sheet(df)
+        df_db = standardize_dataframe(df)
         
         if df_db is None: 
             return None, None, None
