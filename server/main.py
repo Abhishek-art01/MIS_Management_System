@@ -11,9 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 # Internal Imports
-from .database import create_db_and_tables, engine
-from .admin import setup_admin
-from .api import cleaner_api, gps_api, locality_api, page_route_api, download_api
+from database import create_db_and_tables, engine
+from admin import setup_admin
+from api import cleaner_api, gps_api, locality_api, page_route_api, download_api
 
 # --- 1. CONFIGURATION & PATHS ---
 BASE_DIR = Path(__file__).resolve().parent

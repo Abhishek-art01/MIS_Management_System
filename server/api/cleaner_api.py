@@ -20,14 +20,14 @@ from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 
 # --- INTERNAL IMPORTS ---
-from ..auth import verify_password, get_password_hash
-from ..database import create_db_and_tables, get_session, engine
-from ..models import User, ClientData, RawTripData, OperationData, TripData, T3AddressLocality, T3LocalityZone, T3ZoneKm, BARowData
-from ..cleaner.mis_data_cleaner import process_client_data, process_raw_data,process_ba_row_data
-from ..cleaner.fastag_data_cleaner import process_fastag_data
-from ..cleaner.cleaner_helper import create_styled_excel
-from ..cleaner.cleaner_helper import bulk_save_unique, sync_addresses_to_t3
-from ..cleaner.operation_data_cleaner import process_operation_app_data
+from auth import verify_password, get_password_hash
+from database import create_db_and_tables, get_session, engine
+from models import User, ClientData, RawTripData, OperationData, TripData, T3AddressLocality, T3LocalityZone, T3ZoneKm, BARowData
+from cleaner.mis_data_cleaner import process_client_data, process_raw_data,process_ba_row_data
+from cleaner.fastag_data_cleaner import process_fastag_data
+from cleaner.cleaner_helper import create_styled_excel
+from cleaner.cleaner_helper import bulk_save_unique, sync_addresses_to_t3
+from cleaner.operation_data_cleaner import process_operation_app_data,process_operaton_manual_data
 
 # 1. Setup paths relative to THIS file
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -143,14 +143,39 @@ async def clean_data(
                 "db_rows_added": rows_saved, 
                 "new_addresses_added": new_addresses
             }
-        # --- C. OPERATION ---            
+        # --- C. APP OPERATION ---            
 
-        elif cleanerType == "operation":
+        elif cleanerType == "operation_app":
             file_data = []
             for f in files:
                 content = await f.read()
                 file_data.append((f.filename, content))
             df_result, excel_output, filename = process_operation_app_data(file_data)
+
+            if excel_output is None:
+                return Response("Error processing data", status_code=400)
+
+            generated_dir = GENERATED_DIR
+            os.makedirs(generated_dir, exist_ok=True)
+            save_path = generated_dir / filename
+            with open(save_path, "wb") as f:
+                f.write(excel_output.read())
+
+            row_count = len(df_result) if df_result is not None else "Formatting Only"
+            return {
+                "status": "success",
+                "file_url": filename,
+                "rows_processed": row_count,
+                "db_rows_added": rows_saved
+            }
+
+        #--- D. Operation Manual ---
+        elif cleanerType == "operation_manual":
+            file_data = []
+            for f in files:
+                content = await f.read()
+                file_data.append((f.filename, content))
+            df_result, excel_output, filename = process_operaton_manual_data(file_data)
 
             if excel_output is None:
                 return Response("Error processing data", status_code=400)

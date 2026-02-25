@@ -10,6 +10,10 @@ import traceback
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from datetime import datetime, timedelta
+import os
+import pandas as pd
+from datetime import datetime
+from io import BytesIO
 
 from .cleaner_helper import (
     get_mandatory_columns, 
@@ -17,7 +21,8 @@ from .cleaner_helper import (
     standardize_dataframe,
     format_excel_sheet,
     clean_columns,
-    clean_address
+    clean_address,
+    
 )
 
 
@@ -274,3 +279,102 @@ def process_operation_app_data(file_list_bytes):
 # ==========================================
 # 2. MANUAL OPERATION DATA CLEANER
 # ==========================================
+
+
+
+
+def process_operaton_manual_data(file_data):
+    """
+    file_data = [(filename, bytes_content)]
+    """
+
+    final_dfs = []
+
+    for file_name, content in file_data:
+
+        # ------------------------------------------
+        # 1. Read Excel (NO HEADER)
+        # ------------------------------------------
+        df = pd.read_excel(BytesIO(content), header=None)
+        df = df.dropna(how="all")
+
+        # ------------------------------------------
+        # 2. Rename Columns by POSITION
+        # ------------------------------------------
+        new_columns = [
+            "trip_id",          # 0
+            "flight_number",    # 1
+            "employee_id",      # 2
+            "employee_name",    # 3
+            "address",          # 4
+            "contact_no",       # 5
+            "cab_last_digit",   # 6
+            "pickup_time",      # 7
+            "reporting_time",   # 8
+            "mis_remark"        # 9
+        ]
+
+        if len(df.columns) < len(new_columns):
+            raise ValueError(
+                f"{file_name}: Column count mismatch. Found {len(df.columns)}"
+            )
+
+        df = df.iloc[:, :len(new_columns)]
+        df.columns = new_columns
+
+        # ------------------------------------------
+        # 3. Drop Invalid Employee Rows
+        # ------------------------------------------
+        
+
+        # ------------------------------------------
+        # 4. Extract Date from Filename
+        # ------------------------------------------
+        try:
+            date_str = file_name.split()[-1].replace(".xlsx", "")
+            file_date = datetime.strptime(date_str, "%d-%m-%Y").date()
+        except Exception:
+            file_date = None
+
+        df["date"] = file_date
+
+        # ------------------------------------------
+        # 5. Reporting Area (Office) Logic
+        # ------------------------------------------
+        df["office"] = (
+            df["address"]
+            .astype(str)
+            .str.extract(r'EMPLOYEE ADDRESS TO\s*"([^"]+)"', expand=False)
+            .ffill()
+        )
+        df["office"] = df["office"].ffill()
+        df = df[
+            df["employee_id"].notna()
+            & df["employee_id"].astype(str).str.strip().ne("")
+            & df["employee_id"].astype(str).str.upper().ne("EMP ID")
+        ]
+
+        # ------------------------------------------
+        # 6. Route No Formatting
+        # ------------------------------------------
+        df["trip_id"] = df["trip_id"].ffill()
+        df["trip_id"] = "Route No.:- " + df["trip_id"].astype(str)
+
+        final_dfs.append(df)
+
+    # ------------------------------------------
+    # 7. Merge All Files
+    # ------------------------------------------
+    if not final_dfs:
+        return None, None, None
+
+    final_df = pd.concat(final_dfs, ignore_index=True)
+
+    # ------------------------------------------
+    # 8. Export to BytesIO
+    # ------------------------------------------
+    output = BytesIO()
+    final_df.to_excel(output, index=False, engine="openpyxl")
+    output.seek(0)
+
+    return final_df, output, "processed_operation_manual.xlsx"

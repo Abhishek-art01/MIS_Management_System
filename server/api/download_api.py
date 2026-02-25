@@ -20,11 +20,11 @@ from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 
 # --- INTERNAL IMPORTS ---
-from ..auth import verify_password, get_password_hash
-from ..database import create_db_and_tables, get_session, engine
-from ..models import User, ClientData, RawTripData, OperationData, TripData, T3AddressLocality, T3LocalityZone, T3ZoneKm, BARowData
-from ..cleaner.mis_data_cleaner import process_client_data, process_raw_data,process_ba_row_data
-from ..cleaner.fastag_data_cleaner import process_fastag_data
+from auth import verify_password, get_password_hash
+from database import create_db_and_tables, get_session, engine
+from models import User, ClientData, RawTripData, OperationData, TripData, T3AddressLocality, T3LocalityZone, T3ZoneKm, BARowData
+from cleaner.mis_data_cleaner import process_client_data, process_raw_data,process_ba_row_data
+from cleaner.fastag_data_cleaner import process_fastag_data
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent

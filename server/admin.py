@@ -4,9 +4,9 @@ from fastapi import Request
 from sqlmodel import Session, select
 
 # Internal Imports
-from .database import engine
-from .models import User, TripData, ClientData, RawTripData, OperationData, T3AddressLocality
-from .auth import verify_password, get_password_hash
+from database import engine
+from models import User, TripData, ClientData, RawTripData, OperationData, T3AddressLocality
+from auth import verify_password, get_password_hash
 
 # --- 1. AUTHENTICATION BACKEND ---
 class AdminAuth(AuthenticationBackend):

@@ -11,7 +11,7 @@ import traceback
 from openpyxl.utils import get_column_letter
 
 #=================================================================
-from ..models import OperationData
+from models import OperationData
 #=================================================================
 
 
@@ -258,7 +258,31 @@ def get_xls_style_data(book, xf_index, row_idx, col_idx):
         return bg_hex, font_hex, bool(font.bold)
     except Exception as e:
         print(f"[DEBUG ERROR] Style extraction failed at Row {row_idx}, Col {col_idx}: {e}")
-        return None, None, False    
+        return None, None, False 
+
+def clean_columns(columns):
+    return (
+        columns
+        .str.replace(r"\n", " ", regex=True)
+        .str.replace(r"\t", " ", regex=True)
+        .str.replace(r"\s+", " ", regex=True)
+        .str.strip()
+        .str.lower()
+        .str.replace(r"[^\w\s]", "", regex=True)
+        .str.replace(" ", "_")
+    )
+
+
+def clean_address(series: pd.Series) -> pd.Series:
+    return (
+        series.astype(str)
+        .str.replace("-", " ", regex=False)
+        .str.replace(",", " ", regex=False)
+        .str.replace("/", " ", regex=False)
+        .str.replace(r"\s+", " ", regex=True)
+        .str.strip()
+        .str.upper()
+    )   
 
 
 # ==========================================

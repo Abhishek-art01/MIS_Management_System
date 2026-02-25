@@ -892,6 +892,7 @@ dependencies = [
     { name = "pypdf2" },
     { name = "sqladmin" },
     { name = "sqlmodel" },
+    { name = "uvicorn" },
     { name = "xlrd" },
     { name = "xlsxwriter" },
 ]
@@ -911,6 +912,7 @@ requires-dist = [
     { name = "pypdf2", specifier = ">=3.0.1" },
     { name = "sqladmin", specifier = ">=0.22.0" },
     { name = "sqlmodel", specifier = ">=0.0.30" },
+    { name = "uvicorn", specifier = ">=0.40.0" },
     { name = "xlrd", specifier = ">=2.0.2" },
     { name = "xlsxwriter", specifier = ">=3.2.9" },
 ]

@@ -62,6 +62,36 @@ class TripDataBase(DynamicSQLModel):
     b2b_deducted: Optional[float] = None
     total_km: Optional[float] = None
 
+class TripDataFile(DynamicSQLModel):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    
+    # ... (Your existing fields remain the same) ...
+    shift_date: Optional[str] = None
+    trip_direction: Optional[str] = None
+    trip_id: Optional[str] = None
+    flight_number: Optional[str] = None
+    employee_id: Optional[str] = None
+    gender: Optional[str] = None
+    emp_category: Optional[str] = None
+    employee_name: Optional[str] = None
+    address: Optional[str] = None
+    landmark: Optional[str] = None
+    shift_time: Optional[str] = None
+    cab_last_digit: Optional[str] = None
+    cab_reg_no: Optional[str] = None
+    cab_type: Optional[str] = None
+    vendor: Optional[str] = None
+    office: Optional[str] = None
+    mis_remark: Optional[str] = None
+    
+    # Special columns
+    unique_id: str = Field(index=True, unique=True)
+    ba_remark: Optional[str] = None
+    route_status: Optional[str] = None
+    clubbing_status: Optional[str] = None
+    
+
 # --- 3. CLIENT DATA ---
 class ClientData(TripDataBase, table=True):
     __tablename__ = "client_data"
