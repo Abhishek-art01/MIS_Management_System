@@ -1,4 +1,4 @@
-import pandas as pd
+cdimport pandas as pd
 import numpy as np
 import pdfplumber
 import io
@@ -11,7 +11,6 @@ import traceback
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from datetime import datetime, timedelta
-
 from .cleaner_helper import (
     get_mandatory_columns, 
     get_xls_style_data, 
