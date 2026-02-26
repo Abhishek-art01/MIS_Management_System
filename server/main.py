@@ -13,7 +13,8 @@ from starlette.middleware.sessions import SessionMiddleware
 # Internal Imports
 from database import create_db_and_tables, engine
 from admin import setup_admin
-from api import cleaner_api, gps_api, locality_api, page_route_api, download_api
+from api import cleaner_api, locality_api, page_route_api, download_api
+from api import audit_trips_api
 
 # --- 1. CONFIGURATION & PATHS ---
 BASE_DIR = Path(__file__).resolve().parent
@@ -24,7 +25,7 @@ DIRS = {
     "home": CLIENT_DIR / "HomePage",
     "login": CLIENT_DIR / "LoginPage",
     "cleaner": CLIENT_DIR / "DataCleaner",
-    "gps": CLIENT_DIR / "GPSCorner",
+    "Audit_trips": CLIENT_DIR / "Audit_trips",
     "operation-manager": CLIENT_DIR / "OperationManager",
     "locality": CLIENT_DIR / "LocalityCorner",
     "components": CLIENT_DIR / "Components"
@@ -50,7 +51,7 @@ app = FastAPI(lifespan=lifespan)
 
 
 app.include_router(cleaner_api.router)
-app.include_router(gps_api.router)
+app.include_router(audit_trips_api.router)
 app.include_router(locality_api.router)
 app.include_router(page_route_api.router)
 app.include_router(download_api.router)
@@ -60,7 +61,7 @@ app.include_router(download_api.router)
 app.mount("/home-static", StaticFiles(directory=DIRS["home"]), name="home_static")
 app.mount("/login-static", StaticFiles(directory=DIRS["login"]), name="login_static")
 app.mount("/cleaner-static", StaticFiles(directory=DIRS["cleaner"]), name="cleaner_static")
-app.mount("/gps-static", StaticFiles(directory=DIRS["gps"]), name="gps_static")
+app.mount("/audit_trip-static", StaticFiles(directory=DIRS["audit_trips"]), name="audit_trips_static")
 app.mount("/locality-static", StaticFiles(directory=DIRS["locality"]), name="locality_static")
 app.mount("/operation-manager-static", StaticFiles(directory=DIRS["operation-manager"]), name="operation-manager_static")
 app.mount("/components-static", StaticFiles(directory=DIRS["components"]), name="components_static")
@@ -69,7 +70,7 @@ templates = {
     "home": Jinja2Templates(directory=DIRS["home"]),
     "login": Jinja2Templates(directory=DIRS["login"]),
     "cleaner": Jinja2Templates(directory=DIRS["cleaner"]),
-    "gps": Jinja2Templates(directory=DIRS["gps"]),
+    "audit_trips": Jinja2Templates(directory=DIRS["audit_trips"]),
     "locality": Jinja2Templates(directory=DIRS["locality"]),
     "operation-manager": Jinja2Templates(directory=DIRS["operation-manager"]),
     "components": Jinja2Templates(directory=DIRS["components"]),
