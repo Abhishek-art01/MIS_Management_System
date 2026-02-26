@@ -15,10 +15,8 @@ from datetime import datetime, timedelta
 from .cleaner_helper import (
     get_mandatory_columns, 
     get_xls_style_data, 
-    standardize_dataframe, 
     format_excel_sheet,
     clean_columns,
-    clean_address,
     create_styled_excel,
     sync_addresses_to_t3
 )
@@ -131,17 +129,12 @@ def process_client_data(file_content):
 
         df["unique_id"] = df.apply(generate_unique_id, axis=1)
         df["data_source"] = "CLIENT"
-
-        # 8. Standardize & Export
-        # Note: We are returning the Excel file directly. 
-        # We are NOT calling 'bulk_save_unique' or any DB function here.
-        df_db = standardize_dataframe(df)
         
-        if df_db is None: 
+        if df is None: 
             return None, None, None
 
-        print(f"✅ Cleaning Complete. Returning Excel with {len(df_db)} rows.")
-        return create_styled_excel(df_db, "Client_Cleaned")
+        print(f"✅ Cleaning Complete. Returning Excel with {len(df)} rows.")
+        return create_styled_excel(df, "Client_Cleaned")
 
     except Exception as e:
         print(f"❌ Client Cleaner Error: {e}")
@@ -247,9 +240,6 @@ def process_raw_data(file_list_bytes):
         # format='mixed' handles various Excel time strings
         final_db['shift_time'] = pd.to_datetime(final_db['shift_time'], errors='coerce', format='mixed').dt.strftime('%H:%M')
 
-    # 3. Final Step: Use imported helpers
-    final_db = standardize_dataframe(final_db)
-    return create_styled_excel(final_db, "Raw_Cleaned")
 
 
 # ==========================================
@@ -399,15 +389,7 @@ def process_ba_row_data(file_content):
         print(f"🔹 Data Transformed. Renamed columns to: {list(df_final.columns[:5])}...")
         print("🔹 Calling Standardizer...")
 
-        # 6. STANDARDIZE
-        if 'standardize_dataframe' in globals():
-            df_final = standardize_dataframe(df_final)
-            
-            if df_final is None:
-                print("❌ Standardization failed. Check if DB model matches these columns.")
-                return None, None, None
-        else:
-            print("⚠️ 'standardize_dataframe' function not found. Skipping.")
+
 
         # 7. EXPORT
         print("🔹 Generating Excel...")

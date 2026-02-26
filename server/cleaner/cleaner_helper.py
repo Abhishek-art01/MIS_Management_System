@@ -11,33 +11,65 @@ import traceback
 from openpyxl.utils import get_column_letter
 
 #=================================================================
-from models import OperationData
+from models import TripDataFile
 #=================================================================
 
 
 #=================================================================
-
-metadata = {'created_at','updated_at','operation_type','processed_by'}
 
 def get_mandatory_columns():
-    """Get all column names from OperationData model"""
-    columns = []
+    """Get all column names from the model, skipping metadata fields."""
     
-    # Get fields from model
-    for field_name, field in OperationData.__fields__.items():
-        # Skip metadata columns
-        if field_name not in metadata:
-            columns.append(field_name)
+    # Define the fields you want to skip (e.g., auto-generated IDs or timestamps)
+    metadata_cols = {"id", "unique_id", "created_at", "updated_at"} 
     
-    return columns
+    # Using modern SQLModel / Pydantic v2 syntax:
+    return [
+        field_name for field_name in TripDataFile.model_fields 
+        if field_name not in metadata_cols
+    ]
+
+def clean_columns(columns):
+    cleaned = (
+        columns
+        .str.replace(r"\n", " ", regex=True)        # remove line breaks
+        .str.replace(r"\t", " ", regex=True)        # remove tabs
+        .str.replace(r"\s+", " ", regex=True)       # normalize spaces
+        .str.strip()                                # trim edges
+        .str.lower()                                # lowercase
+        .str.replace(r"[^\w\s]", "", regex=True)    # remove special chars
+        .str.replace(" ", "_")                      # snake_case
+    )
+    return cleaned
 
 
-
-def format_excel_headers(ws, start_row=1, start_col=1):
+def format_excel_sheet(ws,start_col=1,start_row=1):
     """
-    Format headers in an Excel worksheet.
-    
-    Args:
+    Final Excel formatter:
+    - Header style (blue, bold, white)
+    - Cambria font for all cells
+    - Wrap text ON
+    - Row height = 30
+    - Auto-fit columns
+    """
+    # Styles
+    header_fill = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
+    header_font = Font(name="Cambria", size=12, bold=True, color="FFFFFF")
+    cell_font = Font(name="Cambria")
+
+    align_center_wrap = Alignment(
+        horizontal="center",
+        vertical="center",
+        wrap_text=True
+    )
+
+    border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin")
+    )
+    """Args:
         ws: Worksheet object
         start_row: Row number where headers start (default: 1)
         start_col: Column number where headers start (default: 1)
@@ -109,77 +141,6 @@ def format_excel_headers(ws, start_row=1, start_col=1):
 
     return ws
 
-
-def clean_columns(columns):
-    cleaned = (
-        columns
-        .str.replace(r"\n", " ", regex=True)        # remove line breaks
-        .str.replace(r"\t", " ", regex=True)        # remove tabs
-        .str.replace(r"\s+", " ", regex=True)       # normalize spaces
-        .str.strip()                                # trim edges
-        .str.lower()                                # lowercase
-        .str.replace(r"[^\w\s]", "", regex=True)    # remove special chars
-        .str.replace(" ", "_")                      # snake_case
-    )
-    return cleaned
-
-
-def clean_address(series: pd.Series) -> pd.Series:
-    """
-    Cleans address text exactly like:
-    =UPPER(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(A2,"-"," "),","," "),"/"," "))
-    """
-    return (
-        series
-        .astype(str)
-        .str.replace("-", " ", regex=False)
-        .str.replace(",", " ", regex=False)
-        .str.replace("/", " ", regex=False)
-        .str.replace(r"\s+", " ", regex=True)  # normalize spaces
-        .str.strip()
-        .str.upper()
-    )
-
-
-
-from openpyxl.utils import get_column_letter
-
-def format_excel_sheet(ws):
-    """
-    Final Excel formatter:
-    - Header style (blue, bold, white)
-    - Cambria font for all cells
-    - Wrap text ON
-    - Row height = 30
-    - Auto-fit columns
-    """
-    # Styles
-    header_fill = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
-    header_font = Font(name="Cambria", size=12, bold=True, color="FFFFFF")
-    cell_font = Font(name="Cambria")
-
-    align_center_wrap = Alignment(
-        horizontal="center",
-        vertical="center",
-        wrap_text=True
-    )
-
-    border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin")
-    )
-
-    # 1. Header formatting (First Row)
-    for cell in ws[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = align_center_wrap
-        cell.border = border
-
-    ws.row_dimensions[1].height = 30
-
     # 2. Cell formatting + row height (Data Rows)
     for row in ws.iter_rows(min_row=2):
         ws.row_dimensions[row[0].row].height = 30
@@ -211,9 +172,6 @@ def format_excel_sheet(ws):
             ws.column_dimensions[col_letter].width = 30
 
 
-
-def standardize_dataframe(df):
-    return df
 
 def get_xls_style_data(book, xf_index, row_idx, col_idx):
     """
@@ -259,30 +217,7 @@ def get_xls_style_data(book, xf_index, row_idx, col_idx):
     except Exception as e:
         print(f"[DEBUG ERROR] Style extraction failed at Row {row_idx}, Col {col_idx}: {e}")
         return None, None, False 
-
-def clean_columns(columns):
-    return (
-        columns
-        .str.replace(r"\n", " ", regex=True)
-        .str.replace(r"\t", " ", regex=True)
-        .str.replace(r"\s+", " ", regex=True)
-        .str.strip()
-        .str.lower()
-        .str.replace(r"[^\w\s]", "", regex=True)
-        .str.replace(" ", "_")
-    )
-
-
-def clean_address(series: pd.Series) -> pd.Series:
-    return (
-        series.astype(str)
-        .str.replace("-", " ", regex=False)
-        .str.replace(",", " ", regex=False)
-        .str.replace("/", " ", regex=False)
-        .str.replace(r"\s+", " ", regex=True)
-        .str.strip()
-        .str.upper()
-    )   
+  
 
 
 # ==========================================
