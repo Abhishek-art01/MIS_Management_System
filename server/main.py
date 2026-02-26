@@ -25,7 +25,7 @@ DIRS = {
     "home": CLIENT_DIR / "HomePage",
     "login": CLIENT_DIR / "LoginPage",
     "cleaner": CLIENT_DIR / "DataCleaner",
-    "Audit_trips": CLIENT_DIR / "Audit_trips",
+    "audit_trips": CLIENT_DIR / "Audit_trips",
     "operation-manager": CLIENT_DIR / "OperationManager",
     "locality": CLIENT_DIR / "LocalityCorner",
     "components": CLIENT_DIR / "Components"
@@ -61,7 +61,7 @@ app.include_router(download_api.router)
 app.mount("/home-static", StaticFiles(directory=DIRS["home"]), name="home_static")
 app.mount("/login-static", StaticFiles(directory=DIRS["login"]), name="login_static")
 app.mount("/cleaner-static", StaticFiles(directory=DIRS["cleaner"]), name="cleaner_static")
-app.mount("/audit_trip-static", StaticFiles(directory=DIRS["audit_trips"]), name="audit_trips_static")
+app.mount("/audit_trips-static", StaticFiles(directory=DIRS["audit_trips"]), name="audit_trips_static")
 app.mount("/locality-static", StaticFiles(directory=DIRS["locality"]), name="locality_static")
 app.mount("/operation-manager-static", StaticFiles(directory=DIRS["operation-manager"]), name="operation-manager_static")
 app.mount("/components-static", StaticFiles(directory=DIRS["components"]), name="components_static")
