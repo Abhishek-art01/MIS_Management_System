@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv
+.env.example
+*.pyc
+.venv/
+secrets.json
+.others
+
+
+
+
