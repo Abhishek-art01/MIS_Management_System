@@ -14,53 +14,34 @@ import os
 import pandas as pd
 from datetime import datetime
 from io import BytesIO
-
+from models import TripDataFile
 from .cleaner_helper import (
     get_mandatory_columns, 
     get_xls_style_data, 
     format_excel_sheet,
-    clean_columns,
-    
+    clean_cell_value,
+    create_styled_excel,
+    sync_addresses_to_t3
 )
 
 
-# ==========================================
-# 1. APP OPERATION DATA CLEANER
-# ==========================================
 
-
+# ==========================================
+# 1. APP OPERATION DATA CLEANER (Fully Optimized)
+# ==========================================
 def process_operation_app_data(file_list_bytes):
     # 1. Configuration
     COLUMN_TO_RENAME = {
         'DATE': 'shift_date', 'TRIP ID': 'trip_id', 'FLT NO.': 'flight_number', 
         'SAP ID': 'employee_id', 'EMP NAME': 'employee_name', 'EMPLOYEE ADDRESS': 'address', 
         'PICKUP LOCATION': 'landmark', 'DROP LOCATION': 'office', 'CAB NO': 'cab_last_digit',
-        'PICKUP TIME': 'pickup_time', 'REMARKS': 'mis_remark'
+        'AIRPORT DROP TIME': 'shift_time', 'REMARKS': 'mis_remark'
     }
-    SKIP_HEADERS = ['CONTACT NO', 'GUARD ROUTE', 'AIRPORT DROP TIME']
+    SKIP_HEADERS = ['CONTACT NO', 'GUARD ROUTE', 'PICKUP TIME']
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Operation_Data"
-    
-    # ... (Styles setup same as before) ...
-    align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    border = Border(left=Side(style="thin"), right=Side(style="thin"), top=Side(style="thin"), bottom=Side(style="thin"))
+    data_rows = []
 
-    try:
-        MANDATORY_HEADERS = get_mandatory_columns()
-    except:
-        MANDATORY_HEADERS = list(COLUMN_TO_RENAME.values())
-
-    for col_idx, header in enumerate(MANDATORY_HEADERS, 1):
-        ws.cell(row=1, column=col_idx, value=header)
-    
-    target_row = 2
-    data_rows = [] 
-    extra_headers_map = {} 
-    next_extra_col_idx = len(MANDATORY_HEADERS) + 1
-
-    # 3. Processing Loop
+    # 2. Extraction Loop (Extract Data + Evaluate Styles)
     for filename, content in file_list_bytes:
         if not filename.lower().endswith('.xls'): continue
         print(f"\n--- Processing File: {filename} ---")
@@ -70,309 +51,281 @@ def process_operation_app_data(file_list_bytes):
             rs = rb.sheet_by_index(0)
             source_headers = [str(rs.cell_value(0, c)).strip().upper() for c in range(rs.ncols)]
             
-            # Map columns
-            # --- START ADDED LOGIC: IDENTIFY SPECIFIC COLUMN INDICES ---
+            # Identify specific columns for the Color Logic
             idx_trip = next((i for i, h in enumerate(source_headers) if 'TRIP ID' in h), None)
             idx_sap = next((i for i, h in enumerate(source_headers) if 'SAP ID' in h), None)
             idx_addr = next((i for i, h in enumerate(source_headers) if 'EMPLOYEE ADDRESS' in h), None)
+            check_indices = [idx for idx in [idx_trip, idx_sap, idx_addr] if idx is not None]
 
-            col_to_target_map = {}
-            # --- END ADDED LOGIC ---
-
-            for idx, raw_header in enumerate(source_headers):
-                if any(skip in raw_header for skip in SKIP_HEADERS): continue
-                match = next((val for key, val in COLUMN_TO_RENAME.items() if key in raw_header), None)
-                if match:
-                    col_to_target_map[idx] = {'type': 'mandatory', 'name': match}
-                else:
-                    if raw_header not in extra_headers_map:
-                        extra_headers_map[raw_header] = next_extra_col_idx
-                        ws.cell(row=1, column=next_extra_col_idx, value=raw_header)
-                        next_extra_col_idx += 1
-                    col_to_target_map[idx] = {'type': 'extra', 'name': raw_header}
-
-            # 4. Process Data Rows
+            # Parse Rows
             for r_idx in range(1, rs.nrows):
                 row_vals = [str(rs.cell_value(r_idx, c)).strip() for c in range(rs.ncols)]
                 if sum(1 for v in row_vals if v != "") <= 3: 
-                    continue
+                    continue # Skip mostly empty rows
 
-                row_data_map = {} 
-                db_row_dict = {}
-                
-                # Logic Flags for Style Detection across the entire row
-                row_has_yellow_bg = False
-                row_has_red_font = False
-
-                # --- START ADDED LOGIC: 3-COLUMN COUNTERS ---
+                raw_row_dict = {}
                 red_count = 0
                 yellow_count = 0
-                check_indices = [idx for idx in [idx_trip, idx_sap, idx_addr] if idx is not None]
-                # --- END ADDED LOGIC ---
 
-                # Pass 1: Extract data and scan row for color indicators
+                # Extract cells and check styles
                 for c_idx in range(rs.ncols):
-                    bg, fg, is_bold = get_xls_style_data(rb, rs.cell_xf_index(r_idx, c_idx), r_idx, c_idx)
+                    raw_header = source_headers[c_idx]
+                    if any(skip in raw_header for skip in SKIP_HEADERS): continue
                     
-                    # --- START ADDED LOGIC: UPDATE COUNTERS BASED ON 3 SPECIFIC COLUMNS ---
+                    val = rs.cell_value(r_idx, c_idx)
+                    if isinstance(val, float) and val.is_integer():
+                        val = int(val)
+                    raw_row_dict[raw_header] = val
+
+                    # Check colors only on the 3 critical columns
                     if c_idx in check_indices:
+                        bg, fg, _ = get_xls_style_data(rb, rs.cell_xf_index(r_idx, c_idx), r_idx, c_idx)
                         if fg == "FF0000": red_count += 1
                         if bg == "FFFF00": yellow_count += 1
-                    # --- END ADDED LOGIC ---
-                    
-                    if fg == "FF0000": row_has_red_font = True
-                    if bg == "FFFF00": row_has_yellow_bg = True
-                    
-                    if c_idx in col_to_target_map:
-                        target_header = col_to_target_map[c_idx]['name']
-                        val = rs.cell_value(r_idx, c_idx)
-                        row_data_map[target_header] = {'val': val, 'bg': bg, 'fg': fg, 'bold': is_bold}
-                        db_row_dict[target_header] = val
 
-                # --- START ADDED LOGIC: RE-EVALUATE FLAGS BASED ON 3-COLUMN RULE ---
-                row_has_red_font = (red_count == 3)
-                row_has_yellow_bg = (yellow_count == 3)
-                # --- END ADDED LOGIC ---
+                # Apply Business Logic
+                if red_count == 3:
+                    raw_row_dict['REMARKS'] = "Cancel"
+                elif yellow_count == 3:
+                    raw_row_dict['REMARKS'] = "Alt Veh"
 
-                # Pass 2: Apply Business Logic Overrides (Priority: Red > Yellow)
-                if row_has_red_font:
-                    db_row_dict['mis_remark'] = "Cancel"
-                    print(f"[LOGIC] Row {r_idx}: Red found -> Marked Cancel")
-                elif row_has_yellow_bg:
-                    db_row_dict['mis_remark'] = "Alt Veh"
-                    print(f"[LOGIC] Row {r_idx}: Yellow found -> Marked Alt Veh")
-
-                # Pass 3: Write to Excel Output
-                ws.row_dimensions[target_row].height = 25
-                for c_out, m_header in enumerate(MANDATORY_HEADERS, 1):
-                    cell = ws.cell(row=target_row, column=c_out)
+                # Keep row if it has identity
+                if raw_row_dict.get('SAP ID') or raw_row_dict.get('EMP NAME'):
+                    data_rows.append(raw_row_dict)
                     
-                    # Get value from dict (contains overrides like 'Cancel')
-                    cell.value = db_row_dict.get(m_header, "")
-                    
-                    # Styling for the mis_remark column based on triggers
-                    if m_header == 'mis_remark':
-                        if row_has_red_font:
-                            cell.font = Font(color="FF0000", bold=True)
-                        elif row_has_yellow_bg:
-                            cell.fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type='solid')
-                            cell.font = Font(bold=True)
-                    elif m_header in row_data_map:
-                        # Carry over original formatting for other columns
-                        d = row_data_map[m_header]
-                        if d['bg']:
-                            cell.fill = PatternFill(start_color=d['bg'], end_color=d['bg'], fill_type='solid')
-                        cell.font = Font(bold=d['bold'], color=d['fg'] if d['fg'] else None)
-                    
-                    cell.alignment = align_center
-                    cell.border = border
-
-                # Extra check for dynamic extra columns
-                for extra_name, extra_col_idx in extra_headers_map.items():
-                    cell = ws.cell(row=target_row, column=extra_col_idx)
-                    if extra_name in row_data_map:
-                        cell.value = row_data_map[extra_name]['val']
-                        cell.alignment = align_center
-                        cell.border = border
-
-                # Append row to DB list
-                if db_row_dict.get('employee_id') or db_row_dict.get('employee_name'):
-                    data_rows.append(db_row_dict)
-                    target_row += 1
-            
             rb.release_resources()
+            
         except Exception as e:
             print(f"[BREAKING ERROR] File {filename}: {e}")
             traceback.print_exc()
 
-    # --- DATAFRAME POST-PROCESSING ---
-    df_db = pd.DataFrame(data_rows)
-    if not df_db.empty:
-        # 1. Helper: Convert Serial Date to DD-MM-YYYY
-        def convert_date(d):
-            try:
-                # Handle Excel Serial (e.g., 46023)
-                f_val = float(d)
-                # Excel's base date is 1899-12-30
-                dt = datetime(1899, 12, 30) + timedelta(days=f_val)
-                return dt.strftime('%d-%m-%Y')
-            except:
-                return str(d)
+    if not data_rows:
+        return None, None, None
 
-        # 2. Helper: Convert Serial Time to HH:MM
-        def convert_time(t):
-            try:
-                f_val = float(t) % 1 # MOD 1 logic
-                seconds = int(round(f_val * 86400))
-                return (datetime.min + timedelta(seconds=seconds)).strftime('%H:%M')
-            except:
-                return str(t)
-
-        print("[DEBUG] Converting Date to DD-MM-YYYY and calculating Shift Time...")
-        df_db['shift_date'] = df_db['shift_date'].apply(convert_date)
-        df_db['pickup_time'] = df_db['pickup_time'].apply(convert_time)
-
-        # 3. Logic: SHIFT TIME = PICKUP TIME + 2 HOURS
-        # Convert DD-MM-YYYY back to datetime for calculation
-        temp_pickup_dt = pd.to_datetime(df_db['shift_date'] + " " + df_db['pickup_time'], dayfirst=True, errors='coerce')
-        
-        # Add 2 Hours
-        temp_shift_dt = temp_pickup_dt + pd.Timedelta(hours=2)
-        shift_date_dt = pd.to_datetime(df_db["shift_date"], dayfirst=True).dt.date
-
-        # 4. Populate Final Columns
-        df_db['shift_time'] = temp_shift_dt.dt.strftime('%H:%M')
-        fixed_drop_dt = temp_shift_dt.where(
-            temp_shift_dt.dt.date == shift_date_dt,
-            temp_shift_dt - pd.Timedelta(days=1)
-        )
-        df_db["drop_time"] = fixed_drop_dt.dt.strftime("%d-%m-%Y %H:%M")
-
-        # Keep pickup_time as HH:MM
-        pickup_dt = fixed_drop_dt - pd.Timedelta(hours=2)
-        df_db["pickup_time"] = pickup_dt.dt.strftime("%d-%m-%Y %H:%M")
-
-
-        # 5. Fill Excel Sheet cells with calculated data
-        # We rewrite the Excel logic here to ensure the calculated fields are in the file
-        for r_idx, row_data in enumerate(df_db.to_dict('records'), 2):
-            for c_idx, header in enumerate(MANDATORY_HEADERS, 1):
-                cell = ws.cell(row=r_idx, column=c_idx, value=row_data.get(header, ""))
-                cell.alignment = align_center
-                cell.border = border
-
-        # Headers to upper case
-        # --- 3. THE CLEANING BLOCK (FIXED) ---
-        # Convert all column names to UPPERCASE first
-        df_db.columns = df_db.columns.str.strip().str.upper()
-
-        if "EMPLOYEE_ADDRESS" in df_db.columns:
-            df_db["EMPLOYEE_ADDRESS"] = (
-                df_db["EMPLOYEE_ADDRESS"]
-                .astype(str)
-                .str.strip()
-                .str.upper()
-            )
-
-        # Final conversion of all text to Upper
-        text_cols = df_db.select_dtypes(include="object").columns
-        df_db[text_cols] = df_db[text_cols].apply(lambda col: col.str.upper())
-        df_db = df_db.fillna("").astype(str)
-
-        # --- 4. WRITE CLEANED DATA TO EXCEL ---
-        # Update headers to match uppercase
-        FINAL_HEADERS = [h.upper() for h in MANDATORY_HEADERS]
-        for col_idx, header in enumerate(FINAL_HEADERS, 1):
-            ws.cell(row=1, column=col_idx, value=header)
-
-
-        df_db = df_db.fillna("").astype(str)
-
-    format_excel_sheet(ws)
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
+    # 3. Pandas Processing
+    df = pd.DataFrame(data_rows)
     
-    return df_db, output, "Operation_Cleaned.xlsx"
+    # Rename matching columns to DB format
+    rename_map = {k: v for k, v in COLUMN_TO_RENAME.items() if k in df.columns}
+    df = df.rename(columns=rename_map)
+
+    # 4. Safe Date & Time Conversion Helpers
+    def convert_date(d):
+        if pd.isna(d) or str(d).strip() == "": return ""
+        try:
+            return (datetime(1899, 12, 30) + timedelta(days=float(d))).strftime('%d-%m-%Y')
+        except: return str(d).strip()
+
+    def convert_time(t):
+        if pd.isna(t) or str(t).strip() == "": return ""
+        try:
+            seconds = int(round((float(t) % 1) * 86400))
+            return (datetime.min + timedelta(seconds=seconds)).strftime('%H:%M')
+        except: return str(t).strip()
+
+    # Apply conversions
+    if 'shift_date' in df.columns: df['shift_date'] = df['shift_date'].apply(convert_date)
+    if 'shift_time' in df.columns: df['shift_time'] = df['shift_time'].apply(convert_time)
+    office_mapping = {
+    "Delhi IGI T3": "Terminal-3",
+    "Delhi Airport": "Terminal-3",
+    "Delhi IGI T2": "Terminal-2",
+    }
+
+    if "office" in df.columns:
+        df["office"] = df["office"].replace(office_mapping)
+
+    # 6. Add Missing Model Headers Dynamically
+    valid_model_columns = list(TripDataFile.model_fields.keys())
+    for db_col in valid_model_columns:
+        if db_col not in df.columns:
+            df[db_col] = "" 
+
+    # 7. Generate Unique ID
+    def generate_unique_id(row):
+        t_id = str(row.get('trip_id', '')).strip()
+        e_id = str(row.get('employee_id', '')).strip()
+        if t_id.lower() == 'nan': t_id = ''
+        if e_id.lower() == 'nan': e_id = ''
+        return f"{t_id}{e_id}"
+
+    df["unique_id"] = df.apply(generate_unique_id, axis=1)
+    df["data_source"] = "OPERATION_APP"
+    df["trip_direction"] = "PICKUP"
+    df["vendor"] = "UNITED FACILITIES"
+
+    # 8. Text Formatting (All uppercase)
+    text_cols = df.select_dtypes(include=["object", "string"]).columns
+    df[text_cols] = df[text_cols].apply(lambda col: col.astype(str).str.upper().str.strip())
+    
+    # 9. Dynamically filter columns based on the model
+    columns_to_keep = [col for col in valid_model_columns if col in df.columns]
+    df = df[columns_to_keep].fillna("").astype(str)
+
+    print(f"✅ App Operation Cleaning Complete. Processed {len(df)} rows.")
+    
+    # 10. Generate output file
+    return create_styled_excel(df, "Operation_App_Cleaned")
 # ==========================================
-# 2. MANUAL OPERATION DATA CLEANER
+# 2. MANUAL OPERATION DATA CLEANER (Optimized)
 # ==========================================
-
-
-
-
-def process_operaton_manual_data(file_data):
+def process_operation_manual_data(file_data):
     """
+    Cleans Manual Operation Data and returns a formatted Excel file.
     file_data = [(filename, bytes_content)]
     """
-
     final_dfs = []
 
     for file_name, content in file_data:
+        try:
+            print(f"\n--- Processing Manual File: {file_name} ---")
+            
+            # 1. Read Excel (NO HEADER)
+            df = pd.read_excel(io.BytesIO(content), header=None)
+            df = df.dropna(how="all")
 
-        # ------------------------------------------
-        # 1. Read Excel (NO HEADER)
-        # ------------------------------------------
-        df = pd.read_excel(BytesIO(content), header=None)
-        df = df.dropna(how="all")
+            # 2. Rename Columns by POSITION
+            new_columns = [
+                "route_no",          # 0
+                "flight_number",    # 1
+                "employee_id",      # 2
+                "employee_name",    # 3
+                "address",          # 4
+                "contact_no",       # 5
+                "cab_last_digit",   # 6
+                "pickup_time",      # 7
+                "shift_time",   # 8
+                "mis_remark"        # 9
+            ]
 
-        # ------------------------------------------
-        # 2. Rename Columns by POSITION
-        # ------------------------------------------
-        new_columns = [
-            "trip_id",          # 0
-            "flight_number",    # 1
-            "employee_id",      # 2
-            "employee_name",    # 3
-            "address",          # 4
-            "contact_no",       # 5
-            "cab_last_digit",   # 6
-            "pickup_time",      # 7
-            "reporting_time",   # 8
-            "mis_remark"        # 9
-        ]
+            if len(df.columns) < len(new_columns):
+                print(f"⚠️ {file_name}: Column mismatch. Found {len(df.columns)}. Skipping.")
+                continue
 
-        if len(df.columns) < len(new_columns):
-            raise ValueError(
-                f"{file_name}: Column count mismatch. Found {len(df.columns)}"
+            df = df.iloc[:, :len(new_columns)]
+            df.columns = new_columns
+
+            # 3. Extract Date from Filename
+            try:
+                # Assumes format like "filename 24-02-2026.xlsx"
+                date_str = file_name.split()[-1].replace(".xlsx", "").replace(".xls", "")
+                file_date = datetime.strptime(date_str, "%d-%m-%Y").strftime('%d-%m-%Y')
+            except Exception:
+                file_date = ""
+
+            df["shift_date"] = file_date
+
+            # 4. Reporting Area (Office) Logic
+            # Extract office from header rows and forward fill
+            df["office"] = (
+                df["address"]
+                .astype(str)
+                .str.extract(r'EMPLOYEE ADDRESS TO\s*"([^"]+)"', expand=False)
+                .ffill()
             )
 
-        df = df.iloc[:, :len(new_columns)]
-        df.columns = new_columns
+            # 5. Route No & Trip ID Formatting
+            # Fix the .0 float issue before forward filling
+            df["route_no"] = df["route_no"].apply(lambda x: int(x) if isinstance(x, float) and x.is_integer() else x)
+            df["route_no"] = df["route_no"].ffill()
+            
+            # Keep a clean version of the trip ID for the unique_id generator later
+            clean_route_no = df["route_no"].copy() 
+            df["route_no"] = "Route No.:- " + df["route_no"].astype(str)
 
-        # ------------------------------------------
-        # 3. Drop Invalid Employee Rows
-        # ------------------------------------------
-        
+            # 6. Drop Invalid Employee Rows (Done AFTER ffill so data cascades correctly)
+            df = df[
+                df["employee_id"].notna()
+                & df["employee_id"].astype(str).str.strip().ne("")
+                & df["employee_id"].astype(str).str.upper().ne("EMP ID")
+                & df["employee_id"].astype(str).str.upper().ne("NAN")
+            ]
+            
+            df["trip_direction"] = "PICKUP" 
+            df["vendor"] = "UNITED FACILITIES"
+            
+            # Attach the clean trip ID temporarily for hashing
+            df["_clean_route_no"] = clean_route_no
+            final_dfs.append(df)
+            
+        except Exception as e:
+            print(f"[BREAKING ERROR] File {file_name}: {e}")
+            traceback.print_exc()
 
-        # ------------------------------------------
-        # 4. Extract Date from Filename
-        # ------------------------------------------
-        try:
-            date_str = file_name.split()[-1].replace(".xlsx", "")
-            file_date = datetime.strptime(date_str, "%d-%m-%Y").date()
-        except Exception:
-            file_date = None
-
-        df["date"] = file_date
-
-        # ------------------------------------------
-        # 5. Reporting Area (Office) Logic
-        # ------------------------------------------
-        df["office"] = (
-            df["address"]
-            .astype(str)
-            .str.extract(r'EMPLOYEE ADDRESS TO\s*"([^"]+)"', expand=False)
-            .ffill()
-        )
-        df["office"] = df["office"].ffill()
-        df = df[
-            df["employee_id"].notna()
-            & df["employee_id"].astype(str).str.strip().ne("")
-            & df["employee_id"].astype(str).str.upper().ne("EMP ID")
-        ]
-
-        # ------------------------------------------
-        # 6. Route No Formatting
-        # ------------------------------------------
-        df["trip_id"] = df["trip_id"].ffill()
-        df["trip_id"] = "Route No.:- " + df["trip_id"].astype(str)
-
-        final_dfs.append(df)
-
-    # ------------------------------------------
     # 7. Merge All Files
-    # ------------------------------------------
     if not final_dfs:
         return None, None, None
 
     final_df = pd.concat(final_dfs, ignore_index=True)
 
-    # ------------------------------------------
-    # 8. Export to BytesIO
-    # ------------------------------------------
-    output = BytesIO()
-    final_df.to_excel(output, index=False, engine="openpyxl")
-    output.seek(0)
+    # 8. Add Missing Model Headers Dynamically
+    valid_model_columns = list(TripDataFile.model_fields.keys())
+    for db_col in valid_model_columns:
+        if db_col not in final_df.columns:
+            final_df[db_col] = ""
+            
+    
+            
 
-    return final_df, output, "processed_operation_manual.xlsx"
+    def generate_trip_id(row):
+        route_label = str(row.get('route_no', '')).strip().upper()
+        shift_date_raw = str(row.get('shift_date', '')).strip()
+        dir_id = str(row.get('trip_direction', '')).strip().upper()
+
+        # --- Convert Date String to Excel Serial Number (e.g., 46076) ---
+        serial_date = ""
+        try:
+            if shift_date_raw:
+                # Parse the date string
+                dt_obj = datetime.strptime(shift_date_raw, '%d-%m-%Y')
+                # Excel's base date is December 30, 1899
+                excel_base_date = datetime(1899, 12, 30)
+                # Calculate the difference in days
+                serial_date = str((dt_obj - excel_base_date).days)
+        except Exception as e:
+            print(f"Date conversion failed for {shift_date_raw}: {e}")
+            serial_date = shift_date_raw.replace('-', '') # Fallback to digits
+
+        if route_label.lower() == 'nan': route_label = ''
+        
+        # --- Combine to match image: 46055PICKUPROUTE NO.:- 7 ---
+        return f"{route_label}{dir_id}{serial_date}"
+
+    # Apply the updated function
+    final_df["trip_id"] = final_df.apply(generate_trip_id, axis=1)
+
+    # ---------------------------------------------------------
+    # 🔥 GENERATE UNIQUE ID (Now uses the new Trip ID)
+    # ---------------------------------------------------------
+    def generate_unique_id(row):
+        # We can now just use the 'trip_id' we generated directly above!
+        t_id = str(row.get('trip_id', '')).strip() 
+        e_id = str(row.get('employee_id', '')).strip()
+        
+        # Clean up any leftover .0 from floats
+        if t_id.endswith(".0"): t_id = t_id[:-2]
+        if e_id.endswith(".0"): e_id = e_id[:-2]
+        
+        if t_id.lower() == 'nan': t_id = ''
+        if e_id.lower() == 'nan': e_id = ''
+        
+        return f"{t_id}{e_id}"
+
+    final_df["unique_id"] = final_df.apply(generate_unique_id, axis=1)
+    final_df["data_source"] = "OPERATION_MANUAL"
+    
+    # Standardize Office names (Optional, but keeps DB clean)
+    office_mapping = {"DELHI IGI T3": "Terminal 3", "DELHI AIRPORT": "Terminal 3", "DELHI IGI T2": "Terminal-2"}
+    final_df["office"] = final_df["office"].replace(office_mapping)
+
+    # 10. Dynamically filter columns based on the model
+    columns_to_keep = [col for col in valid_model_columns if col in final_df.columns]
+    final_df = final_df[columns_to_keep]
+
+    # Final sweep
+    final_df = final_df.fillna("").astype(str)
+
+    print(f"✅ Manual Operation Cleaning Complete. Processed {len(final_df)} rows.")
+
+    # 11. Export via your custom styled helper
+    return create_styled_excel(final_df, "Operation_Manual_Cleaned")

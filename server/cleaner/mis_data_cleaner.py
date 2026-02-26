@@ -16,7 +16,7 @@ from .cleaner_helper import (
     get_mandatory_columns, 
     get_xls_style_data, 
     format_excel_sheet,
-    clean_columns,
+    clean_cell_value,
     create_styled_excel,
     sync_addresses_to_t3
 )
@@ -133,7 +133,7 @@ def process_client_data(file_content):
         traceback.print_exc()
         return None, None, None
 # ==========================================
-# RAW DATA CLEANER (Fully Updated)
+# 2. RAW DATA CLEANER (Fully Updated)
 # ==========================================
 def _clean_single_raw_df(df):
 
@@ -335,162 +335,133 @@ def process_raw_data(file_list_bytes):
 
 
 # ==========================================
-# 4. BAROW DATA CLEANER
+# 3. BA ROW DATA CLEANER (Aligned to Actual CSV)
 # ==========================================
+
+
 def process_ba_row_data(file_content):
     try:
         print("🔹 Starting BA Row Data Processing...")
         
-        # 1. READ CSV
-        df = pd.read_csv(io.BytesIO(file_content), low_memory=False)
-        print(f"🔹 CSV Loaded. Columns: {list(df.columns[:5])}...")
-
+        # 1. READ CSV (Force everything to string to prevent auto-parsing dates)
+        df = pd.read_csv(io.BytesIO(file_content), low_memory=False, dtype=str)
         df.columns = df.columns.str.strip()
-        print(f"🔹 CSV Loaded. Found Columns: {list(df.columns)}")
 
-        # 2. FILTER & TRANSFORM
-        if "Trip Id" in df.columns:
-            df["Trip Id"] = pd.to_numeric(df["Trip Id"], errors='coerce').fillna(0)
-            df = df[df["Trip Id"] != 0]
+        # 🔥 FIX 1: Drop Escort Team Rows immediately
+        if "Team" in df.columns:
+            df = df[df["Team"].astype(str).str.upper() != "ESCORT"]
 
-        # Shift Time Logic
-        if "Trip Type" in df.columns:
-            df["Shift Time"] = df["Trip Type"].astype(str)
-            mask_log = df["Shift Time"].str.contains("LOGIN|LOGOUT", case=False, na=False)
-            df.loc[mask_log, "Shift Time"] = "00:00"
-        else:
-            df["Shift Time"] = "00:00"
+        # 2. ACTUAL CSV MAPPING
+        MAPPING = {
+            "EmpId": "employee_id",
+            "Trip ID": "trip_id",
+            "Name": "employee_name",
+            "Gender": "gender",
+            "Crew Type": "emp_category",
+            "Selected Destination": "address",
+            "Billing Zone": "landmark",
+            "Flight Number": "flight_number",
+            "Flight Type": "flight_type",
+            "Trip Office": "office",
+            "Vendor ID": "vendor",
+            "Shift Type/Time": "shift_time",
+            "Trip Sheet Comment": "mis_remark",
+            "Not Boarding Reason": "ba_remark"
+        }
+        df = df.rename(columns=MAPPING)
 
-        # Trip Direction
+        # 🔥 FIX 2: Office Standardization
+        office_mapping = {
+            "Delhi IGI T3": "Terminal-3",
+            "Delhi Airport": "Terminal-3",
+            "Delhi IGI T2": "Terminal-2"
+        }
+        if "office" in df.columns:
+            # We use .strip() to ensure no hidden spaces prevent a match
+            df["office"] = df["office"].str.strip().replace(office_mapping)
+
+        # ---------------------------------------------------------
+        # 🔥 THE RECONSTRUCTION FIX: YYYY-MM-DD to DD-MM-YYYY
+        # ---------------------------------------------------------
+        if "Date" in df.columns:
+            def manual_date_reformat(date_val):
+                if pd.isna(date_val) or str(date_val).strip() == "":
+                    return ""
+                
+                # Ensure it's a string and clean it
+                ds = str(date_val).strip().replace("/", "-")
+                
+                try:
+                    # Split the string (Expects YYYY-MM-DD)
+                    parts = ds.split("-")
+                    
+                    if len(parts) == 3:
+                        # If the first part is 4 digits, it's YYYY-MM-DD
+                        if len(parts[0]) == 4:
+                            year = parts[0]
+                            month = parts[1].zfill(2)
+                            day = parts[2].zfill(2)
+                        # If the last part is 4 digits, it's DD-MM-YYYY
+                        else:
+                            day = parts[0].zfill(2)
+                            month = parts[1].zfill(2)
+                            year = parts[2]
+                            
+                        return f"{day}-{month}-{year}"
+                except:
+                    pass
+                return ds
+
+            df["shift_date"] = df["Date"].apply(manual_date_reformat)
+            df["trip_date"] = df["shift_date"]
+
+        # 3. Direction Logic
         if "Direction" in df.columns:
-            df["Trip Direction"] = df["Direction"].str.upper().map({
+            df["trip_direction"] = df["Direction"].str.upper().map({
                 "LOGIN": "PICKUP", "LOGOUT": "DROP"
-            })
+            }).fillna("")
         else:
-            df["Trip Direction"] = ""
+            df["trip_direction"] = ""
 
-        # Safe Column Access for Pickup/Drop
-        df["Pickup Time"] = df.get("Duty Start", "")
-        df["Drop Time"] = df.get("Duty End", "")
-
-        # Registration Cleaning
+        # 4. Registration Cleaning
         if "Registration" in df.columns:
-            df["Registration"] = (
+            df["cab_reg_no"] = (
                 df["Registration"].astype(str)
                 .str.replace("-", "", regex=False)
                 .str.replace(" ", "", regex=False)
                 .str.upper()
+                .replace("NAN", "")
             )
 
-        # Location Logic
-        is_drop = df["Trip Direction"] == "DROP"
-        is_pickup = df["Trip Direction"] == "PICKUP"
-        
-        start_addr = df.get("Start Location Address", "")
-        end_addr = df.get("End Location Address", "")
-        start_land = df.get("Start Location Landmark", "")
-        end_land = df.get("End Location Landmark", "")
+        # 5. Generate Unique ID
+        def generate_unique_id(row):
+            t_id = str(row.get('trip_id', '')).strip()
+            e_id = str(row.get('employee_id', '')).strip() 
+            
+            if t_id.endswith(".0"): t_id = t_id[:-2]
+            if e_id.endswith(".0"): e_id = e_id[:-2]
+            
+            if t_id.lower() == 'nan': t_id = ''
+            if e_id.lower() == 'nan': e_id = ''
+            
+            return f"{t_id}{e_id}"
 
-        df["Airport Name"] = np.where(is_drop, start_addr, end_addr)
-        df["Address"] = np.where(is_pickup, start_addr, end_addr)
-        df["Landmark"] = np.where(is_pickup, start_land, end_land)
+        df["unique_id"] = df.apply(generate_unique_id, axis=1)
+        df["data_source"] = "BA_ROW_DATA"
 
-        if "Leg Date" in df.columns:
-            # Standard case
-            df["Trip Date"] = df["Leg Date"].astype(str) + " " + df["Shift Time"].astype(str)
-        elif "Date" in df.columns:
-            # Fallback to 'Date' column
-            df["Trip Date"] = df["Date"].astype(str) + " " + df["Shift Time"].astype(str)
-        elif "Pickup Time" in df.columns:
-            # Fallback: Extract Date from Duty Start (e.g., '2026-01-01 18:00:00')
-            print("⚠️ 'Leg Date' missing. Extracting date from 'Pickup Time'.")
-            df["Temp_Date"] = pd.to_datetime(df["Pickup Time"], errors='coerce').dt.strftime('%d-%m-%Y')
-            df["Trip Date"] = df["Temp_Date"].astype(str) + " " + df["Shift Time"].astype(str)
-            df["Leg Date"] = df["Temp_Date"] # Fill Leg Date so it's not empty in DB
-        else:
-            # Worst case: No date found
-            print("❌ ERROR: Could not find 'Leg Date', 'Date', or 'Pickup Time'. Trip Date will be empty.")
-            df["Leg Date"] = ""
-            df["Trip Date"] = ""
+        # 6. Final Model Alignment
+        valid_model_columns = list(TripDataFile.model_fields.keys())
+        for db_col in valid_model_columns:
+            if db_col not in df.columns:
+                df[db_col] = ""
 
-        if "Trip Date" in df.columns:
-            df["Shift Date"] = df["Trip Date"]
-        else:
-            df["Shift Date"] = ""
+        columns_to_keep = [col for col in valid_model_columns if col in df.columns]
+        df_final = df[columns_to_keep].fillna("").astype(str)
 
-        df["In App/ Extra"] = "BA Row Data"
-        df["BA REMARK"] = df.get("Trip Status", "")
-        df["MiS Remark"] = df.get("Comments", "")
-
-        # 3. PREPARE DATABASE MAPPING (Title Case -> snake_case)
-        DB_MAP = {
-            "Leg Date": "leg_date",
-            "Trip Id": "trip_id",
-            "Employee ID": "employee_id",
-            "Gender": "gender",
-            "EMP_CATEGORY": "emp_category",
-            "Employee Name": "employee_name",
-            "Shift Time": "shift_time",
-            "Pickup Time": "pickup_time",
-            "Drop Time": "drop_time",
-            "Trip Direction": "trip_direction",
-            "Registration": "cab_reg_no",
-            "Cab Type": "cab_type",
-            "Vendor": "vendor",
-            "Office": "office",
-            "Airport Name": "airport_name",
-            "Landmark": "landmark",
-            "Address": "address",
-            "Flight Number": "flight_number",
-            "Flight Category": "flight_category",
-            "Flight Route": "flight_route",
-            "Flight Type": "flight_type",
-            "Trip Date": "trip_date",
-            "MiS Remark": "mis_remark",
-            "In App/ Extra": "in_app_extra",
-            "Traveled Employee Count": "traveled_emp_count",
-            "UNA2": "una2",
-            "UNA": "una",
-            "BA REMARK": "ba_remark",
-            "Route Status": "route_status",
-            "Clubbing Status": "clubbing_status",
-            "GPS TIME": "gps_time",
-            "GPS REMARK": "gps_remark",
-            "Billing Zone Name": "billing_zone_name",
-            "Leg Type": "leg_type",
-            "Trip Source": "trip_source",
-            "Trip Type": "trip_type",
-            "Leg Start": "leg_start",
-            "Leg End": "leg_end",
-            "Audit Results": "audit_results",
-            "Audit Done By": "audit_done_by",
-            "Trip Audited": "trip_audited"
-        }
-
-        # 4. FIX: ENSURE ALL COLUMNS EXIST
-        # This loop prevents the KeyError by creating missing columns
-        for col in DB_MAP.keys():
-            if col not in df.columns:
-                df[col] = ""
-
-        # 5. SELECT AND RENAME
-        # Now it is safe to select because we guaranteed they exist
-        df_final = df[list(DB_MAP.keys())].copy()
-        df_final.rename(columns=DB_MAP, inplace=True)
-
-        print(f"🔹 Data Transformed. Renamed columns to: {list(df_final.columns[:5])}...")
-        print("🔹 Calling Standardizer...")
-
-
-
-        # 7. EXPORT
-        print("🔹 Generating Excel...")
+        print(f"✅ BA Row Cleaning Complete. Returning {len(df_final)} rows.")
         return create_styled_excel(df_final, "BA_Row_Data_Cleaned")
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         print(f"❌ BA Row Data Cleaner Error: {e}")
         return None, None, None
-
-

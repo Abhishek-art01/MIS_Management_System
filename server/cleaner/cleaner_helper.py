@@ -29,7 +29,7 @@ def get_mandatory_columns():
         if field_name not in metadata_cols
     ]
 
-def clean_columns(columns):
+def clean_cell_value(columns):
     cleaned = (
         columns
         .str.replace(r"\n", " ", regex=True)        # remove line breaks

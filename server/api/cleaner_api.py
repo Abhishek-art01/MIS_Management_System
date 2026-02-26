@@ -27,7 +27,7 @@ from cleaner.mis_data_cleaner import process_client_data, process_raw_data,proce
 from cleaner.fastag_data_cleaner import process_fastag_data
 from cleaner.cleaner_helper import create_styled_excel
 from cleaner.cleaner_helper import bulk_save_unique, sync_addresses_to_t3
-from cleaner.operation_data_cleaner import process_operation_app_data,process_operaton_manual_data
+from cleaner.operation_data_cleaner import process_operation_app_data,process_operation_manual_data
 
 # 1. Setup paths relative to THIS file
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -175,7 +175,7 @@ async def clean_data(
             for f in files:
                 content = await f.read()
                 file_data.append((f.filename, content))
-            df_result, excel_output, filename = process_operaton_manual_data(file_data)
+            df_result, excel_output, filename = process_operation_manual_data(file_data)
 
             if excel_output is None:
                 return Response("Error processing data", status_code=400)
