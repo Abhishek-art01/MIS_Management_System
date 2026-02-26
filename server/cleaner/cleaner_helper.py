@@ -21,7 +21,7 @@ def get_mandatory_columns():
     """Get all column names from the model, skipping metadata fields."""
     
     # Define the fields you want to skip (e.g., auto-generated IDs or timestamps)
-    metadata_cols = {"id", "unique_id", "created_at", "updated_at"} 
+    metadata_cols = {"created_at", "updated_at"} 
     
     # Using modern SQLModel / Pydantic v2 syntax:
     return [

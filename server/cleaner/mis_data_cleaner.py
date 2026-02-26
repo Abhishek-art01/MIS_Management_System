@@ -21,9 +21,8 @@ from .cleaner_helper import (
     sync_addresses_to_t3
 )
 
-
 # ==========================================
-# 1. CLIENT DATA CLEANER (No DB Upload)
+# 1. CLIENT DATA CLEANER (Fully Optimized)
 # ==========================================
 def process_client_data(file_content):
     """
@@ -31,22 +30,7 @@ def process_client_data(file_content):
     Does NOT save to the database.
     """
     try:
-        # 1. Define Columns to Drop
-        DROP_COLS = [
-            'Bunit ID', 'Cycle Start', 'Cycle End', 'Shift Date', 'Project', 'Cost Center', 
-            'Department', 'Planned Emp Count', 'Travelled Emp Count', 'Billable Emp Count', 
-            'No Show', 'Planned Escort', 'Actual Escort', 'Emp km', 'Trip Cost', 
-            'Trip AC Cost', 'Per Emp Cost', 'Escort Cost', 'Penalty', 'Vendor Penalty', 
-            'Total Cost', 'Assigned Contract', 'Cab Contract', 'Billing Zone', 
-            'Trip Billing Zone', 'Emp Sigin Type', 'Escort ID', 'Toll Cost', 
-            'State Tax Co   st', 'Parking Or Toll Cost', 'Per Employee Overhead Cost', 
-            'Trip Source', 'Extra Kms Based On Billable Employee Count', 'Billing Kms', 
-            'Actual Kms At Employee Level', 'Grid Km', 'Employee Adjustment Distance', 
-            'Trip Adjustment', 'Total Distance', 'State Tax Cost', 'Flight Category', 
-            'Flight Route', 'Flight Type', 'Cab Type', 'Airport Name'
-        ]
-
-        # 2. Define Mapping (CSV Headers -> DB Headers)
+        # 1. Define Mapping (CSV Headers -> DB Headers)
         COLUMN_MAPPING = {
             "Trip ID": "trip_id",
             "Billing period": "shift_date", 
@@ -65,9 +49,10 @@ def process_client_data(file_content):
             "Flight Number": "flight_number",
         }
 
-        # 3. Read File (Try CSV, fallback to Excel)
+        # 2. Read File (Try CSV, fallback to Excel)
+        # Adding dtype=str prevents pandas from deleting leading zeros on IDs
         try:
-            df = pd.read_csv(io.BytesIO(file_content))
+            df = pd.read_csv(io.BytesIO(file_content), dtype=str)
             print("🔹 Processed as CSV")
         except:
             try:
@@ -77,22 +62,23 @@ def process_client_data(file_content):
                 print(f"❌ Error reading file: {e}")
                 return None, None, None
 
-        # 4. Drop & Rename
-        df = df.drop(columns=[c for c in DROP_COLS if c in df.columns], errors='ignore')
+        # 3. Rename to Database Columns
         df = df.rename(columns=COLUMN_MAPPING)
 
-        # 5. Add Missing Mandatory Headers (Dynamic from Helper)
-        mandatory_cols = get_mandatory_columns()
+        # 4. Standardize 'office' column names
+        office_mapping = {
+            "Delhi IGI T3": "Terminal-3",
+            "Delhi Airport": "Terminal-3",
+            "Delhi IGI T2": "Terminal-2"
+        }
+        if "office" in df.columns:
+            df["office"] = df["office"].replace(office_mapping)
         
-        # Handle if helper returns Dict or List
-        if isinstance(mandatory_cols, dict):
-            target_cols = mandatory_cols.values()
-        else:
-            target_cols = mandatory_cols 
-
-        for db_col in target_cols:
+        # 5. Add Missing Model Headers Dynamically
+        valid_model_columns = list(TripDataFile.model_fields.keys())
+        for db_col in valid_model_columns:
             if db_col not in df.columns:
-                df[db_col] = "" # Fill missing columns with empty string
+                df[db_col] = "" 
 
         # 6. Cleaning Logic
         # Clean Cab Reg No
@@ -116,7 +102,7 @@ def process_client_data(file_content):
                 .replace({"Login": "Pickup", "Logout": "Drop"})
             )
 
-        # 7. Generate Unique ID (MD5 Hash)
+        # 7. Generate Unique ID (Trip ID + Employee ID)
         def generate_unique_id(row):
             t_id = str(row.get('trip_id', '')).strip()
             e_id = str(row.get('employee_id', '')).strip()
@@ -124,16 +110,22 @@ def process_client_data(file_content):
             if t_id.lower() == 'nan': t_id = ''
             if e_id.lower() == 'nan': e_id = ''
 
-            base = f"{t_id}_{e_id}"
-            return hashlib.md5(base.encode()).hexdigest()
+            return f"{t_id}{e_id}"
 
         df["unique_id"] = df.apply(generate_unique_id, axis=1)
-        df["data_source"] = "CLIENT"
-        
-        if df is None: 
-            return None, None, None
+        df["data_source"] = "CLIENT_DATA"
+        df["clubbing_status"] = "Pay"
+        df["route_status"] = "Pay"
 
-        print(f"✅ Cleaning Complete. Returning Excel with {len(df)} rows.")
+        # 8. DYNAMICALLY FILTER USING THE MODEL 
+        # (This automatically drops all those 40+ extra columns)
+        columns_to_keep = [col for col in valid_model_columns if col in df.columns]
+        df = df[columns_to_keep]
+        
+        # 9. Final safety sweep (Removes stray NaNs)
+        df = df.fillna("").astype(str)
+
+        print(f"✅ Client Cleaning Complete. Returning Excel with {len(df)} rows.")
         return create_styled_excel(df, "Client_Cleaned")
 
     except Exception as e:

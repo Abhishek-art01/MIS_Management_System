@@ -64,8 +64,6 @@ class TripDataBase(DynamicSQLModel):
 
 class TripDataFile(DynamicSQLModel):
     id: Optional[int] = Field(default=None, primary_key=True)
-    
-    
     # ... (Your existing fields remain the same) ...
     shift_date: Optional[str] = None
     trip_direction: Optional[str] = None
