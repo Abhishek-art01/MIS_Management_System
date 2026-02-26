@@ -86,6 +86,7 @@ class TripDataFile(DynamicSQLModel):
     mis_remark: Optional[str] = None
     
     # Special columns
+    data_source : Optional[str] = None
     unique_id: str = Field(index=True, unique=True)
     ba_remark: Optional[str] = None
     route_status: Optional[str] = None

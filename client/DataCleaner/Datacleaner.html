@@ -23,8 +23,9 @@
 
             <div style="margin-top: 20px; text-align: left;">
                 <label style="font-weight: 600; color: #374151; font-size: 0.9rem;">Select Data Type:</label>
-                <select id="cleanerType"
-                    style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 6px; border: 1px solid #d1d5db;">
+                <select id="cleanerType" style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 6px; border: 1px solid #d1d5db;">
+                    <option value="" disabled selected>-- Please select a data type --</option>
+                    
                     <option value="client">Client Data (App)</option>
                     <option value="raw">Raw Data (App)</option>
                     <option value="operation_app">Operation Data (App)</option>
@@ -33,6 +34,22 @@
                     <option value="fastag">Fastag Data (PDF)</option>
                 </select>
             </div>
+
+            <script>
+                function yourExistingUploadFunction() {
+                    // 1. Grab the current value of the dropdown
+                    const selectedType = document.getElementById("cleanerType").value;
+                    
+                    // 2. Stop the process if they haven't picked anything
+                    if (selectedType === "") {
+                        alert("⚠️ Please select a data type before uploading!");
+                        return; // This stops the rest of your upload code from running
+                    }
+                    
+                    // 3. If everything is good, your normal upload code continues here...
+                    console.log("All good! Sending data type:", selectedType);
+                }
+            </script>
 
             <div class="upload-area" id="drop-zone">
                 <input type="file" id="fileInput" accept=".xlsx, .xls, .csv, .pdf" multiple hidden>

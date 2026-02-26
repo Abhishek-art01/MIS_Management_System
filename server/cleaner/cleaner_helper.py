@@ -43,7 +43,7 @@ def clean_columns(columns):
     return cleaned
 
 
-def format_excel_sheet(ws,start_col=1,start_row=1):
+def format_excel_sheet(ws, start_col=1, start_row=1):
     """
     Final Excel formatter:
     - Header style (blue, bold, white)
@@ -52,16 +52,13 @@ def format_excel_sheet(ws,start_col=1,start_row=1):
     - Row height = 30
     - Auto-fit columns
     """
-    # Styles
-    header_fill = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
-    header_font = Font(name="Cambria", size=12, bold=True, color="FFFFFF")
+    # 1. Define Styles
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(name="Cambria", size=11, bold=True, color="FFFFFF")
     cell_font = Font(name="Cambria")
+    
 
-    align_center_wrap = Alignment(
-        horizontal="center",
-        vertical="center",
-        wrap_text=True
-    )
+    align_center_wrap = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
     border = Border(
         left=Side(style="thin"),
@@ -69,107 +66,96 @@ def format_excel_sheet(ws,start_col=1,start_row=1):
         top=Side(style="thin"),
         bottom=Side(style="thin")
     )
-    """Args:
-        ws: Worksheet object
-        start_row: Row number where headers start (default: 1)
-        start_col: Column number where headers start (default: 1)
-    """
     
-    # Define styling
-    header_fill = PatternFill(
-        start_color="366092",  # Dark blue
-        end_color="366092",
-        fill_type="solid"
-    )
-    
-    header_font = Font(
-        name="Calibri",
-        size=11,
-        bold=True,
-        color="FFFFFF"  # White
-    )
-    
-    header_alignment = Alignment(
-        horizontal="center",
-        vertical="center",
-        wrap_text=True  # Enable text wrapping
-    )
-    
-    # Get max column with data
     max_column = ws.max_column
-    
-    # Apply formatting to each header cell
+
+     # ---------------------------------------------------------
+    # 🔥 CAPITALIZE HEADERS HERE
+    # This changes "shift_date" -> "SHIFT DATE"
+    # If you prefer Title Case ("Shift Date"), change .upper() to .title()
+    # ---------------------------------------------------------
+    # 2. Apply Header Formatting (Row 1)
     for col in range(start_col, max_column + 1):
         cell = ws.cell(row=start_row, column=col)
         
-        # Apply styling if cell has a value
         if cell.value:
+            # 🔥 CAPITALIZE AND REMOVE UNDERSCORES HERE
+            cell.value = str(cell.value).replace("_", " ").upper()
+            
+            # Apply your styles
             cell.fill = header_fill
             cell.font = header_font
-            cell.alignment = header_alignment
-    
-    # Set row height for header row
+            cell.alignment = align_center_wrap
+            cell.border = border
+            
     ws.row_dimensions[start_row].height = 30
     
-    # Auto-fit column widths
+    # 3. Apply Data Cell Formatting (Row 2 onwards)
+    for row in ws.iter_rows(min_row=2):
+        ws.row_dimensions[row[0].row].height = 30
+        for cell in row:
+            # We only apply font/alignment if not already specialized (like red/yellow logic)
+            if not cell.font or cell.font.name != "Cambria":
+                cell.font = cell_font
+            cell.alignment = align_center_wrap
+            cell.border = border
+
+    # 4. Auto-fit column widths (min 10, max 50)
     for col in range(start_col, max_column + 1):
         column_letter = get_column_letter(col)
         max_length = 0
         
-        # Check all cells in the column (including header)
         for row in range(start_row, ws.max_row + 1):
             cell = ws.cell(row=row, column=col)
-            
             if cell.value:
-                # Calculate length considering line breaks for wrapped text
                 if isinstance(cell.value, str):
-                    # Find the longest line if text wraps
                     lines = str(cell.value).split('\n')
                     line_length = max(len(line) for line in lines)
                 else:
                     line_length = len(str(cell.value))
                 
-                # Add a little padding
                 adjusted_length = line_length + 2
-                
                 if adjusted_length > max_length:
                     max_length = adjusted_length
-        
-        # Set column width (minimum 10, maximum 50)
-        column_width = min(max(max_length, 10), 50)
-        ws.column_dimensions[column_letter].width = column_width
+                    
+        ws.column_dimensions[column_letter].width = min(max(max_length, 10), 50)
+    
+   
 
+    # 5. Override specific columns by Header Name (Fixed for lowercase DB names)
+    for cell in ws[1]:
+        if not cell.value: continue
+        
+        col_letter = get_column_letter(cell.column)
+        val = str(cell.value).lower().strip()
+        
+        if val in ["address", "employee address", "employee_address"]:
+            ws.column_dimensions[col_letter].width = 80
+        elif val in ["employee_name", "employee name"]:
+            ws.column_dimensions[col_letter].width = 30
+            
     return ws
 
-    # 2. Cell formatting + row height (Data Rows)
-    for row in ws.iter_rows(min_row=2):
-        ws.row_dimensions[row[0].row].height = 30
-        for cell in row:
-            # Note: We don't want to overwrite the Red/Yellow logic 
-            # so we only apply font/alignment if not already specialized
-            cell.font = cell_font
-            cell.alignment = align_center_wrap
-            cell.border = border
-
-    # 3. Auto-fit column width
-    for col in ws.columns:
-        max_length = 0
-        column_idx = col[0].column
-        col_letter = get_column_letter(column_idx)
-
-        for cell in col:
-            if cell.value:
-                max_length = max(max_length, len(str(cell.value)))
-
-        ws.column_dimensions[col_letter].width = max_length + 2
-
-    # 4. Override specific columns by Header Name
-    for cell in ws[1]:
-        col_letter = get_column_letter(cell.column)
-        if cell.value == "EMPLOYEE ADDRESS":
-            ws.column_dimensions[col_letter].width = 80
-        elif cell.value == "EMPLOYEE NAME":
-            ws.column_dimensions[col_letter].width = 30
+def create_styled_excel(df, filename_prefix="Cleaned"):
+    """ Generates Excel and applies the custom format_excel_sheet styles. """
+    output = io.BytesIO()
+    
+    # Create a copy so we don't accidentally modify the original data
+    df_export = df.copy()
+    
+   
+    # 1. Write the DataFrame to BytesIO using the openpyxl engine
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Data')
+        
+        # 2. Get the openpyxl worksheet object
+        worksheet = writer.sheets['Data']
+        
+        # 3. Apply your custom formatting function!
+        format_excel_sheet(worksheet)
+            
+    output.seek(0)
+    return df, output, f"{filename_prefix}.xlsx"
 
 
 
@@ -220,63 +206,6 @@ def get_xls_style_data(book, xf_index, row_idx, col_idx):
   
 
 
-# ==========================================
-# EXCEL GENERATOR HELPER
-# ==========================================
-def create_styled_excel(df, filename_prefix="Cleaned"):
-    """ Generates Excel with consistent formatting. """
-    output = io.BytesIO()
-    
-    # 1. Fetch Mapping dynamically
-    try:
-        # Assuming get_mandatory_columns returns {Friendly: DB_Col}
-        mandatory_map = get_mandatory_columns() 
-        mandatory_headers_list = list(mandatory_map.keys())
-    except:
-        mandatory_map = {}
-        mandatory_headers_list = []
-
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        
-        # 2. Check Data Type
-        # Fastag data has 'Amount' or 'Plaza Name'. 
-        # Standard data uses the mandatory map.
-        is_fastag = 'Amount' in df.columns or 'Plaza Name' in df.columns
-
-        if not is_fastag and mandatory_map:
-            # --- STANDARD CLIENT/RAW DATA LOGIC ---
-            # Create Inverse Map: DB_Col (snake_case) -> Friendly Name
-            inv_map = {v: k for k, v in mandatory_map.items()}
-            
-            # Rename columns to Friendly Names
-            df_export = df.rename(columns=inv_map)
-            
-            # Reorder Columns: Mandatory First -> Then Others
-            export_cols = [h for h in mandatory_headers_list if h in df_export.columns]
-            remaining = [c for c in df_export.columns if c not in mandatory_headers_list and c != 'unique_id']
-            export_cols += remaining
-            
-            df_export = df_export[export_cols]
-        else:
-            # --- FASTAG / GENERIC LOGIC ---
-            # Export as is (we already cleaned it in the specific function)
-            df_export = df
-
-        # 3. Write Data
-        df_export.to_excel(writer, index=False, sheet_name='Data')
-        
-        # 4. Apply Styles
-        workbook = writer.book
-        worksheet = writer.sheets['Data']
-        header_fmt = workbook.add_format({'bold': True, 'bg_color': '#0070C0', 'font_color': 'white'})
-        
-        for i, col in enumerate(df_export.columns):
-            worksheet.write(0, i, col, header_fmt)
-            # Auto-adjust width roughly
-            worksheet.set_column(i, i, 20)
-            
-    output.seek(0)
-    return df, output, f"{filename_prefix}.xlsx"
 
 # ==========================================
 # DATABASE HELPER: BULK SAVE

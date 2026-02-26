@@ -11,6 +11,7 @@ import traceback
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from datetime import datetime, timedelta
+from models import TripDataFile
 from .cleaner_helper import (
     get_mandatory_columns, 
     get_xls_style_data, 
@@ -139,73 +140,128 @@ def process_client_data(file_content):
         print(f"❌ Client Cleaner Error: {e}")
         traceback.print_exc()
         return None, None, None
-
 # ==========================================
-# 2. RAW DATA CLEANER
+# RAW DATA CLEANER (Fully Updated)
 # ==========================================
 def _clean_single_raw_df(df):
+
     try:
+
         # Standardize NaN values
+
         df = df.replace({np.nan: None, "nan": None})
-        
+
+       
+
         # Trip ID Logic
+
         df["Trip_ID"] = np.where(df.iloc[:, 10].astype(str).str.startswith("T"), df.iloc[:, 10], np.nan)
+
         df["Trip_ID"] = df["Trip_ID"].ffill()
 
+
+
         # Identify Row Types
+
         is_header = df.iloc[:, 1].astype(str).str.contains("UNITED FACILITIES", na=False)
-        is_passenger = df.iloc[:, 0].astype(str).str.match(r"^[0-9]+$") 
+
+        is_passenger = df.iloc[:, 0].astype(str).str.match(r"^[0-9]+$")
+
+
 
         # Extraction Maps
+
         h_map = {0: 'TRIP_DATE', 1: 'AGENCY_NAME', 2: 'D_LOGIN', 3: 'VEHICLE_NO', 4: 'DRIVER_NAME', 6: 'DRIVER_MOBILE', 7: 'MARSHALL', 8: 'DISTANCE', 9: 'EMP_COUNT', 10: 'TRIP_COUNT'}
+
         p_map = {0: 'PAX_NO', 1: 'REPORTING_TIME', 2: 'EMPLOYEE_ID', 3: 'EMPLOYEE_NAME', 4: 'GENDER', 5: 'EMP_CATEGORY', 6: 'FLIGHT_NO.', 7: 'ADDRESS', 8: 'REPORTING_LOCATION', 9: 'LANDMARK', 10: 'PASSENGER_MOBILE'}
 
+
+
         df_h = df[is_header].rename(columns=h_map)
+
         df_p = df[is_passenger].rename(columns=p_map)
-        
+
+       
+
         if df_h.empty or df_p.empty:
+
             return pd.DataFrame()
 
+
+
         cols_h = [c for c in h_map.values() if c in df_h.columns] + ['Trip_ID']
+
         cols_p = [c for c in p_map.values() if c in df_p.columns] + ['Trip_ID']
-        
+
+       
+
         merged = pd.merge(df_p[cols_p], df_h[cols_h], on='Trip_ID', how='left')
 
+
+
         # Cleaning Logic
+
         if 'Trip_ID' in merged.columns:
+
             merged['TRIP_ID'] = merged['Trip_ID'].astype(str).str.replace('T', '', regex=False)
+
             merged = merged.drop(columns=['Trip_ID'])
 
+
+
         if 'AGENCY_NAME' in merged.columns:
+
             merged['AGENCY_NAME'] = merged['AGENCY_NAME'].apply(lambda x: "UNITED FACILITIES" if "UNITED FACILITIES" in str(x).upper() else x)
 
+
+
         if 'VEHICLE_NO' in merged.columns:
+
             merged['VEHICLE_NO'] = merged['VEHICLE_NO'].astype(str).str.replace('-', '', regex=False)
 
+
+
         if 'D_LOGIN' in merged.columns:
+
             login = merged['D_LOGIN'].astype(str).str.strip().str.split(' ', n=1, expand=True)
+
             if len(login.columns) > 0: merged['DIRECTION'] = login[0].str.upper().replace({'LOGIN': 'PICKUP', 'LOGOUT': 'DROP'})
+
             if len(login.columns) > 1: merged['SHIFT_TIME'] = login[1]
 
+
+
         # Explicit Removal
+
         cols_to_remove = ['PAX_NO', 'D_LOGIN', 'MARSHALL', 'DISTANCE', 'EMP_COUNT', 'TRIP_COUNT']
+
         merged = merged.drop(columns=cols_to_remove, errors='ignore')
 
+
+
         # Clean string columns
+
         for col in merged.select_dtypes(include=['object']):
+
             merged[col] = merged[col].astype(str).str.upper().str.strip()
 
+
+
         return merged
+
     except Exception as e:
+
         print(f"Error in _clean_single_raw_df: {e}")
+
         return pd.DataFrame()
 
 def process_raw_data(file_list_bytes):
     all_dfs = []
+    
+    # 1. Process files
     for filename, content in file_list_bytes:
         try:
             print(f"Processing file: {filename}")
-            # Ensure we read as string to preserve IDs
             df_raw = pd.read_excel(io.BytesIO(content), header=None, dtype=str).dropna(how="all").reset_index(drop=True)
             cleaned = _clean_single_raw_df(df_raw)
             if not cleaned.empty: 
@@ -219,6 +275,7 @@ def process_raw_data(file_list_bytes):
         
     final_df = pd.concat(all_dfs, ignore_index=True)
 
+    # 2. Map and Format
     DB_MAP = {
         'TRIP_DATE': 'shift_date', 'TRIP_ID': 'trip_id', 'AGENCY_NAME': 'vendor', 
         'FLIGHT_NO.': 'flight_number', 'EMPLOYEE_ID': 'employee_id', 'EMPLOYEE_NAME': 'employee_name', 
@@ -230,15 +287,59 @@ def process_raw_data(file_list_bytes):
 
     final_db = final_df.rename(columns=DB_MAP).fillna("")
     
-    # Date/Time Formatting
     if 'shift_date' in final_db.columns:
         final_db['shift_date'] = pd.to_datetime(final_db['shift_date'], errors='coerce').dt.strftime('%d-%m-%Y')
         final_db['trip_date'] = final_db['shift_date']
     
     if 'shift_time' in final_db.columns:
-        # format='mixed' handles various Excel time strings
         final_db['shift_time'] = pd.to_datetime(final_db['shift_time'], errors='coerce', format='mixed').dt.strftime('%H:%M')
 
+    # 3. Add Missing Mandatory Headers
+    mandatory_cols = get_mandatory_columns() 
+    target_cols = list(mandatory_cols.values()) if isinstance(mandatory_cols, dict) else list(mandatory_cols)
+
+    for db_col in target_cols:
+        if db_col not in final_db.columns:
+            final_db[db_col] = ""
+
+   # 2. Generate Unique ID (Trip ID + Employee ID)
+    def generate_unique_id(row):
+        t_id = str(row.get('trip_id', '')).strip()
+        e_id = str(row.get('employee_id', '')).strip()
+        
+        # Handle pandas 'nan' artifacts
+        if t_id.lower() == 'nan': t_id = ''
+        if e_id.lower() == 'nan': e_id = ''
+
+        # Directly combine them: 1234 + 3456 = "12343456"
+        return f"{t_id}{e_id}"
+
+    final_db["unique_id"] = final_db.apply(generate_unique_id, axis=1)
+    final_db["data_source"] = "RAW_DATA"
+    # Standardize 'office' column names
+    office_mapping = {
+        "DELHI IGI T3": "Terminal-3",
+        "DELHI AIRPORT": "Terminal-3",
+        "DELHI IGI T2": "Terminal-2"
+    }
+    
+    if "office" in final_db.columns:
+        final_db["office"] = final_db["office"].replace(office_mapping)
+    
+    # 5. Safely Filter Columns
+    valid_model_columns = list(TripDataFile.model_fields.keys())
+    
+    # Keep only the columns that exist in BOTH the dataframe and the model
+    columns_to_keep = [col for col in valid_model_columns if col in final_db.columns]
+    final_db = final_db[columns_to_keep]
+
+    # 6. Final safety sweep (removes any stray NaNs that bypass Pandas filters)
+    final_db = final_db.fillna("").astype(str)
+
+    print(f"✅ Raw Cleaning Complete. Returning Excel with {len(final_db)} rows.")
+    
+    # 🔥 FIX: Use create_styled_excel to return the proper tuple and avoid the Worksheet crash
+    return create_styled_excel(final_db, "Raw_Cleaned")
 
 
 # ==========================================
