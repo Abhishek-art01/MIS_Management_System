@@ -169,7 +169,7 @@ def process_operation_app_data(file_list_bytes):
 # ==========================================
 # 2. MANUAL OPERATION DATA CLEANER (Optimized)
 # ==========================================
-def process_operation_manual_data(file_data):
+def process_operation_manual_pickup_data(file_data):
     """
     Cleans Manual Operation Data and returns a formatted Excel file.
     file_data = [(filename, bytes_content)]
@@ -289,7 +289,7 @@ def process_operation_manual_data(file_data):
         if route_label.lower() == 'nan': route_label = ''
         
         # --- Combine to match image: 46055PICKUPROUTE NO.:- 7 ---
-        return f"{route_label}{dir_id}{serial_date}"
+        return f"{serial_date}{dir_id}{route_label}"
 
     # Apply the updated function
     final_df["trip_id"] = final_df.apply(generate_trip_id, axis=1)
@@ -329,3 +329,132 @@ def process_operation_manual_data(file_data):
 
     # 11. Export via your custom styled helper
     return create_styled_excel(final_df, "Operation_Manual_Cleaned")
+
+def process_operation_manual_drop_data(file_data_list):
+    """
+    Consolidated Manual Drop Sheet Processor.
+    Handles multiple files, converts dates to serial numbers, and aligns to DB model.
+    """
+    try:
+        print(f"🔹 Starting Drop Sheet Manual Processing for {len(file_data_list)} files...")
+        final_dfs = []
+
+        for filename, file_content in file_data_list:
+            print(f"  --- Processing: {filename} ---")
+            
+            # 1. Read Excel without headers
+            df = pd.read_excel(io.BytesIO(file_content), header=None)
+
+            # 2. Cleanup: Remove unwanted rows (TRG TYPE and fully empty rows)
+            df = df[df[0].astype(str).str.strip().str.upper() != "TRG TYPE"].reset_index(drop=True)
+            df = df.dropna(how="all").reset_index(drop=True)
+
+            # 3. Identify Metadata Rows (Route info lines)
+            condition = (df[2].astype(str).str.strip().str.upper() == "VENDOR :- UNITED")
+
+            # 4. Initialize Columns and Extract Metadata
+            df["shift_date"] = None
+            df["route_no"] = None
+            df["vendor"] = None
+            df["office"] = None
+
+            df.loc[condition, "shift_date"] = df.loc[condition, 0]
+            df.loc[condition, "route_no"] = df.loc[condition, 1]
+            df.loc[condition, "vendor"] = "UNITED FACILITIES"
+            df.loc[condition, "office"] = df.loc[condition, 3]
+
+            # 5. Forward-fill metadata to employee rows
+            cols = ["shift_date", "route_no", "vendor", "office"]
+            df[cols] = df[cols].ffill()
+
+            # 6. Drop the metadata rows
+            df = df[~condition].reset_index(drop=True)
+
+            # 7. Rename to DB headers
+            rename_map = {
+                0: "flight_number", 1: "employee_id", 2: "employee_name",
+                3: "address", 4: "landmark", 6: "shift_time", 7: "mis_remark"
+            }
+            df = df.rename(columns=rename_map)
+            df = df.drop(columns=[5], errors='ignore')
+
+            df["trip_direction"] = "DROP"
+            df["data_source"] = "DROP_SHEET_MANUAL"
+            
+            final_dfs.append(df)
+
+        if not final_dfs:
+            return None, None, None
+
+        # 8. Merge all processed drop sheets
+        merged_df = pd.concat(final_dfs, ignore_index=True)
+        
+        # ---------------------------------------------------------
+        # 🔥 SHIFT DATE CLEANING LOGIC (Timestamp to DD-MM-YYYY)
+        # ---------------------------------------------------------
+        def clean_shift_date(row):
+            raw_date = row.get('shift_date')
+            
+            if pd.isna(raw_date) or str(raw_date).strip() == "":
+                return ""
+            
+            try:
+                # 1. Parse the timestamp (handles '2026-02-20 00:00:00')
+                dt_obj = pd.to_datetime(raw_date)
+                
+                # 2. Return strictly in DD-MM-YYYY format
+                return dt_obj.strftime('%d-%m-%Y')
+            except Exception:
+                # Fallback for unexpected string formats
+                return str(raw_date).split()[0]
+
+        # Apply to your DataFrame
+        merged_df["shift_date"] = merged_df.apply(clean_shift_date, axis=1)
+
+        # ---------------------------------------------------------
+        # 🔥 UPDATED ID GENERATION (Handles YYYY-MM-DD Timestamps)
+        # ---------------------------------------------------------
+        def generate_ids(row):
+            route_label = str(row.get('route_no', '')).strip().upper()
+            raw_date = str(row.get('shift_date', '')).strip()
+            dir_id = str(row.get('trip_direction', '')).strip().upper()
+            emp_id = str(row.get('employee_id', '')).strip()
+
+            # Fix Date: Handles '2026-02-20 00:00:00' or '20-02-2026'
+            serial_date = ""
+            try:
+                if raw_date:
+                    # pd.to_datetime is much smarter than strptime for mixed formats
+                    dt_obj = pd.to_datetime(raw_date, dayfirst=True)
+                    # Excel Serial Number conversion
+                    excel_base = datetime(1899, 12, 30)
+                    serial_date = str((dt_obj - excel_base).days)
+            except Exception:
+                serial_date = raw_date.replace('-', '').split()[0]
+
+            # Create Trip ID: 46076DROPROUTE 7
+            t_id = f"{serial_date}{dir_id}{route_label}"
+            
+            # Create Unique ID: TripID + EmpID
+            if emp_id.endswith(".0"): emp_id = emp_id[:-2]
+            u_id = f"{t_id}{emp_id}"
+
+            return pd.Series([t_id, u_id])
+
+        merged_df[["trip_id", "unique_id"]] = merged_df.apply(generate_ids, axis=1)
+
+        # 9. Final Model Alignment
+        valid_model_columns = list(TripDataFile.model_fields.keys())
+        for db_col in valid_model_columns:
+            if db_col not in merged_df.columns:
+                merged_df[db_col] = ""
+
+        columns_to_keep = [col for col in valid_model_columns if col in merged_df.columns]
+        df_final = merged_df[columns_to_keep].fillna("").astype(str)
+
+        print(f"✅ Drop Sheet Cleaning Complete. Total Rows: {len(df_final)}")
+        return create_styled_excel(df_final, "Drop_Sheet_Cleaned")
+
+    except Exception as e:
+        traceback.print_exc()
+        return None, None, None

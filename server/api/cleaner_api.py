@@ -27,7 +27,7 @@ from cleaner.mis_data_cleaner import process_client_data, process_raw_data,proce
 from cleaner.fastag_data_cleaner import process_fastag_data
 from cleaner.cleaner_helper import create_styled_excel
 from cleaner.cleaner_helper import bulk_save_unique, sync_addresses_to_t3
-from cleaner.operation_data_cleaner import process_operation_app_data,process_operation_manual_data
+from cleaner.operation_data_cleaner import process_operation_app_data,process_operation_manual_pickup_data,process_operation_manual_drop_data
 
 # 1. Setup paths relative to THIS file
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -170,12 +170,36 @@ async def clean_data(
             }
 
         #--- D. Operation Manual ---
-        elif cleanerType == "operation_manual":
+        elif cleanerType == "operation_manual_pickup":
             file_data = []
             for f in files:
                 content = await f.read()
                 file_data.append((f.filename, content))
-            df_result, excel_output, filename = process_operation_manual_data(file_data)
+            df_result, excel_output, filename = process_operation_manual_pickup_data(file_data)
+
+            if excel_output is None:
+                return Response("Error processing data", status_code=400)
+
+            generated_dir = GENERATED_DIR
+            os.makedirs(generated_dir, exist_ok=True)
+            save_path = generated_dir / filename
+            with open(save_path, "wb") as f:
+                f.write(excel_output.read())
+
+            row_count = len(df_result) if df_result is not None else "Formatting Only"
+            return {
+                "status": "success",
+                "file_url": filename,
+                "rows_processed": row_count,
+                "db_rows_added": rows_saved
+            }
+        #--- D. Operation Manual Drop ---
+        elif cleanerType == "operation_manual_drop":
+            file_data = []
+            for f in files:
+                content = await f.read()
+                file_data.append((f.filename, content))
+            df_result, excel_output, filename = process_operation_manual_drop_data(file_data)
 
             if excel_output is None:
                 return Response("Error processing data", status_code=400)
