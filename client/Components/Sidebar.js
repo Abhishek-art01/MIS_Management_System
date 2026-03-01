@@ -17,8 +17,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     <a href="/audit/mcd" class="sub-nav-item">↳ MCD Audit</a>
                     <a href="/audit/alt-vehicle" class="sub-nav-item">↳ Alt Vehicle</a>
                     <a href="/audit/toll" class="sub-nav-item">↳ Toll Trips</a>
-                    <a href="/audit/b2b" class="sub-nav-item">↳ B2B Trips</a>
-                    <a href="/audit/vehicle" class="sub-nav-item">↳ Vehicle Audit</a>
+                    <a href="/b2b-maker" class="nav-item">🔗 B2B Maker</a>
+                    <a href="/audit/gps" class="sub-nav-item">↳ Gps Audit</a>
                     <a href="/audit/incomplete" class="sub-nav-item">↳ Incomplete</a>
                 </div>
             </div>

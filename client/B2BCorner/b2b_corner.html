@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B2B Trip Maker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/components-static/Sidebar.css">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .header { background: white; padding: 15px 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; justify-content: space-between;}
+        .header h2 { margin: 0; font-size: 1.2rem; color: #1e88e5; }
+        
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(600px, 1fr)); gap: 20px; }
+        
+        .b2b-card { background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e0e0e0; display: flex; flex-direction: column;}
+        
+        .trip-pair-container { display: flex; width: 100%; border-bottom: 1px solid #eee; }
+        
+        .trip-side { flex: 1; padding: 15px; }
+        .trip-side.drop { background-color: #fff8e1; border-right: 2px dashed #ffe082; }
+        .trip-side.pickup { background-color: #e3f2fd; }
+        
+        .trip-side h4 { margin: 0 0 10px 0; font-size: 0.9rem; text-transform: uppercase; color: #555; }
+        .trip-side.drop h4 { color: #d84315; }
+        .trip-side.pickup h4 { color: #1565c0; }
+        
+        .detail-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; }
+        .detail-row strong { color: #000; }
+
+        .card-actions { display: flex; justify-content: space-between; padding: 12px 15px; background: #f9f9f9; }
+        
+        .btn { padding: 8px 20px; font-weight: bold; border-radius: 4px; cursor: pointer; border: none; transition: 0.2s; font-size: 0.9rem; }
+        .btn-reject { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+        .btn-reject:hover { background: #fca5a5; }
+        
+        .btn-approve { background: #d1fae5; color: #059669; border: 1px solid #6ee7b7; }
+        .btn-approve:hover { background: #6ee7b7; }
+
+        .loader { text-align: center; color: #888; font-weight: bold; width: 100%; grid-column: 1 / -1; }
+    </style>
+</head>
+<body>
+    <div id="sidebar-target"></div>
+
+    <div class="dashboard-container" style="margin-left: 270px;">
+        <div class="header">
+            <h2><i class="fa-solid fa-link"></i> Back-to-Back (B2B) Trip Maker</h2>
+            <button class="btn btn-approve" onclick="loadPairs()"><i class="fa-solid fa-rotate-right"></i> Refresh Data</button>
+        </div>
+
+        <div id="b2b-grid" class="grid-container">
+            <div class="loader">Scanning for Potential B2B Pairs...</div>
+        </div>
+    </div>
+
+    <script src="/components-static/Sidebar.js"></script>
+    <script>
+        async function loadPairs() {
+            const grid = document.getElementById('b2b-grid');
+            grid.innerHTML = '<div class="loader"><i class="fa-solid fa-spinner fa-spin"></i> Analyzing trips...</div>';
+
+            try {
+                const response = await fetch('/api/b2b/potential_pairs');
+                const pairs = await response.json();
+
+                grid.innerHTML = '';
+                if(pairs.length === 0) {
+                    grid.innerHTML = '<div class="loader">No pending Back-to-Back pairs found! 🎉</div>';
+                    return;
+                }
+
+                pairs.forEach(pair => {
+                    const drop = pair.drop;
+                    const pick = pair.pickup;
+                    
+                    const card = document.createElement('div');
+                    card.className = 'b2b-card';
+                    card.id = `card-${drop.unique_id}`;
+                    
+                    card.innerHTML = `
+                        <div class="trip-pair-container">
+                            <div class="trip-side drop">
+                                <h4><i class="fa-solid fa-arrow-down"></i> DROP</h4>
+                                <div class="detail-row"><span>ID:</span> <strong>${drop.trip_id}</strong></div>
+                                <div class="detail-row"><span>Cab No:</span> <strong>${drop.cab_reg_no}</strong></div>
+                                <div class="detail-row"><span>Time:</span> <strong>${drop.shift_date} ${drop.shift_time}</strong></div>
+                                <div class="detail-row"><span>Emp:</span> <strong>${drop.employee_name} (${drop.employee_id})</strong></div>
+                                <div class="detail-row" style="margin-top: 8px; color: #d84315;"><strong><i class="fa-solid fa-shield-halved"></i> Guard: ${drop.marshall || 'No'}</strong></div>
+                            </div>
+                            
+                            <div class="trip-side pickup">
+                                <h4><i class="fa-solid fa-arrow-up"></i> PICKUP</h4>
+                                <div class="detail-row"><span>ID:</span> <strong>${pick.trip_id}</strong></div>
+                                <div class="detail-row"><span>Cab No:</span> <strong>${pick.cab_reg_no}</strong></div>
+                                <div class="detail-row"><span>Time:</span> <strong>${pick.shift_date} ${pick.shift_time}</strong></div>
+                                <div class="detail-row"><span>Emp:</span> <strong>${pick.employee_name} (${pick.employee_id})</strong></div>
+                                <div class="detail-row" style="margin-top: 8px; color: #1565c0;"><strong><i class="fa-solid fa-shield-halved"></i> Guard: ${pick.marshall || 'No'}</strong></div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-actions">
+                            <button class="btn btn-reject" onclick="actionBB('${drop.unique_id}', '${pick.unique_id}', false)">
+                                <i class="fa-solid fa-xmark"></i> Not a BB
+                            </button>
+                            <button class="btn btn-approve" onclick="actionBB('${drop.unique_id}', '${pick.unique_id}', true)">
+                                <i class="fa-solid fa-check"></i> Mark as BB
+                            </button>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+
+            } catch(e) {
+                grid.innerHTML = '<div class="loader" style="color:red;">Error loading B2B data.</div>';
+            }
+        }
+
+        async function actionBB(dropId, pickupId, isB2B) {
+            try {
+                await fetch('/api/b2b/mark', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ drop_id: dropId, pickup_id: pickupId, is_b2b: isB2B })
+                });
+                
+                // Remove card from UI instantly for good UX
+                document.getElementById(`card-${dropId}`).remove();
+            } catch (e) {
+                alert("Failed to update database.");
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadPairs);
+    </script>
+</body>
+</html>

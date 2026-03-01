@@ -93,27 +93,27 @@ class TripDataFile(DynamicSQLModel):
 
 # --- 3. CLIENT DATA ---
 class ClientData(TripDataBase, table=True):
-    __tablename__ = "client_data"
+    __tablename__ = "clientdata"
     id: Optional[int] = Field(default=None, primary_key=True)
 
 # --- 4. RAW TRIP DATA ---
 class RawTripData(TripDataBase, table=True):
-    __tablename__ = "raw_trip_data"
+    __tablename__ = "rawtripdata"
     id: Optional[int] = Field(default=None, primary_key=True)
 
 # --- 5.OPERATION DATA ---
 class OperationData(TripDataBase, table=True):
-    __tablename__ = "operation_data"
+    __tablename__ = "operationdata"
     id: Optional[int] = Field(default=None, primary_key=True)
 
 # --- 5.trip Data ---
 class TripData(TripDataBase, table=True):
-    __tablename__ = "trip_data"
+    __tablename__ = "tripdata"
     id: Optional[int] = Field(default=None, primary_key=True)
 
 # --- 6. BA ROW DATA ---
 class BARowData(TripDataBase, table=True):
-    __tablename__ = "ba_row_data"
+    __tablename__ = "barowdata"
     id: Optional[int] = Field(default=None, primary_key=True)
 
 # --- 7. ZONE & KM TABLES (CRITICAL FIXES HERE) ---
