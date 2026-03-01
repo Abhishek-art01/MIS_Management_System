@@ -754,8 +754,130 @@ def _process_axis(pdf_obj):
 # HELPER: UNITED SPECIFIC CLEANER
 # ==========================================
 def _process_united(pdf_obj):
-    return None
+    all_tables = []
 
+    # 1. Extract tables from PDF object
+    for page in pdf_obj.pages:
+        tables = page.extract_tables()
+        for table in tables:
+            if table:
+                all_tables.append(pd.DataFrame(table))
+
+    if not all_tables:
+        return pd.DataFrame()
+
+    # 2. Merge tables
+    df = pd.concat(all_tables, ignore_index=True)
+    df = df.dropna(how="all").reset_index(drop=True)
+
+    # 3. Clean cell values using your robust logic
+    def clean_cell_value(x):
+        if isinstance(x, str):
+            x = x.replace("\n", " ").replace("\t", " ")
+            x = re.sub(r"\s+", " ", x)
+            x = x.strip()
+            if x.lower() in ["na", "n/a", "null", "none", ""]:
+                return np.nan
+        return x
+
+    # Try map first (newer Pandas), fallback to applymap (older Pandas)
+    try:
+        df = df.map(clean_cell_value)
+    except AttributeError:
+        df = df.applymap(clean_cell_value)
+
+    # 4. Locate actual transaction header row dynamically
+    header_idx = -1
+    for i in range(min(150, len(df))):
+        row_str = "".join([str(x).lower() for x in df.iloc[i] if pd.notna(x)])
+        if "date" in row_str and "activity" in row_str and "unique" in row_str:
+            header_idx = i
+            break
+
+    if header_idx == -1:
+        return pd.DataFrame()
+
+    # 5. Slice transaction table
+    df.columns = df.iloc[header_idx]
+    df = df.iloc[header_idx + 1:].reset_index(drop=True)
+
+    # Clean final column names (strict alphanumeric)
+    df.columns = [re.sub(r"[^a-zA-Z0-9]", "", str(c)).lower() for c in df.columns]
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+
+    # 6. Extract Vehicle Number using Forward Fill (Your Logic)
+    vehicle_pattern = r"\b[A-Z]{2}[0-9]{1,2}[A-Z]{1,2}[0-9]{4}\b"
+    
+    def find_vehicle(row):
+        for val in row:
+            if isinstance(val, str):
+                match = re.search(vehicle_pattern, val)
+                if match:
+                    return match.group()
+        return np.nan
+
+    df["Vehicle No"] = df.apply(find_vehicle, axis=1)
+    df["Vehicle No"] = df["Vehicle No"].ffill()
+
+    # 7. Identify columns safely for filtering
+    date_col = next((c for c in df.columns if "date" in c and "time" in c), None)
+    id_col = next((c for c in df.columns if "unique" in c and "id" in c), None)
+    act_col = next((c for c in df.columns if "activity" in c), None)
+
+    # 8. Filter out sub-headers and adjustments
+    sub_header_pattern = r"^[A-Z]{2}[0-9]{1,2}[A-Z]{1,2}[0-9]{4}\s*-"
+    if date_col and id_col:
+        df = df[
+            ~(
+                df[date_col].astype(str).str.match(sub_header_pattern, na=False) &
+                df[id_col].isna()
+            )
+        ]
+        
+    if act_col:
+        df = df[df[act_col].astype(str).str.lower() != "adjustment"].reset_index(drop=True)
+        df = df[df[act_col].astype(str).str.lower() != "activity"].reset_index(drop=True)
+
+    # 9. Map to Final Schema
+    col_map = {}
+    for col in df.columns:
+        c = str(col)
+        if "uniquetransactionid" in c: col_map[col] = "Unique Transaction ID"
+        elif "date" in c and "time" in c: col_map[col] = "Travel Date Time"
+        elif "transactiondescription" in c: col_map[col] = "Plaza Name"
+        elif "amountrsdr" in c or ("amount" in c and "dr" in c): col_map[col] = "Tag Dr/Cr"
+        elif "activity" in c: col_map[col] = "Activity"
+
+    df.rename(columns=col_map, inplace=True)
+
+    # Enforce exact final columns
+    for col in ["Unique Transaction ID", "Travel Date Time", "Plaza Name", "Vehicle No", "Tag Dr/Cr", "Activity", "Plaza ID"]:
+        if col not in df.columns:
+            df[col] = ""
+
+    # 10. Final Value Formatting
+    
+    # A. Apply your ID Cleaner
+    def clean_slash_id(x):
+        if pd.isna(x) or str(x).lower() == "nan": return ""
+        return re.sub(r"\s+", "", str(x))
+    df["Unique Transaction ID"] = df["Unique Transaction ID"].apply(clean_slash_id)
+
+    # B. Clean up Plaza Name (Extracting just the toll name)
+    def parse_plaza(desc):
+        if pd.isna(desc): return ""
+        match = re.search(r"Plaza Name:\s*(.*?)(?:-\s*Lane|$)", str(desc), re.IGNORECASE)
+        return match.group(1).strip() if match else str(desc).strip()
+    df["Plaza Name"] = df["Plaza Name"].apply(parse_plaza)
+    
+    # C. Default Activity to Toll Payment
+    df["Activity"] = "Toll Payment"
+
+    # 11. Final Cleanup
+    df = df.dropna(subset=["Unique Transaction ID"])
+    df = df[(df["Unique Transaction ID"] != "") & (df["Unique Transaction ID"].str.lower() != "nan")]
+
+    return df[["Vehicle No", "Travel Date Time", "Unique Transaction ID", "Plaza Name", "Plaza ID", "Activity", "Tag Dr/Cr"]]
 # ==========================================
 # MAIN FASTAG DATA CLEANER (PDF)
 # ==========================================
