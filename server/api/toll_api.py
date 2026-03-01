@@ -13,6 +13,10 @@ class MarkTollRequest(BaseModel):
     trip_unique_id: str
     selected_toll_ids: List[str]
 
+# --- THE FIX: Helper to clean NaN values for JSON compatibility ---
+def clean_dict(d):
+    return {k: (None if pd.isna(v) else v) for k, v in d.items()}
+
 @router.get("/potential_matches")
 def get_potential_tolls(session: Session = Depends(get_session)):
     # 1. Fetch Trips (Only those that don't already have tolls assigned)
@@ -63,13 +67,17 @@ def get_potential_tolls(session: Session = Depends(get_session)):
         valid_tolls = veh_tolls[(time_diffs >= -1.5) & (time_diffs <= 1.5)]
         
         if not valid_tolls.empty:
-            toll_list = valid_tolls.to_dict(orient='records')
+            # --- APPLY THE FIX HERE ---
+            # Convert to dicts and pass through the cleaner
+            toll_list = [clean_dict(t) for t in valid_tolls.to_dict(orient='records')]
+            trip_dict = clean_dict(trip.to_dict())
             
             # Clean up non-serializable datetime objects before returning JSON
-            trip_dict = trip.to_dict()
             trip_dict.pop('trip_dt', None)
+            trip_dict.pop('cab_clean', None) # remove temp column
             for t in toll_list:
                 t.pop('toll_dt', None)
+                t.pop('veh_clean', None)
                 
             matches.append({
                 "trip": trip_dict,
@@ -103,7 +111,7 @@ def mark_toll_trips(payload: MarkTollRequest, session: Session = Depends(get_ses
             session.add(toll)
 
     # 3. Update the Trip Data
-    trip.unique_toll_id = ",".join(payload.selected_toll_ids) # This requires unique_toll_id to be a string!
+    trip.unique_toll_id = ",".join(payload.selected_toll_ids)
     trip.toll_amount = total_amount
     trip.toll_name = " | ".join(toll_names)
     

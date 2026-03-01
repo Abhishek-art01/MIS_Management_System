@@ -94,11 +94,15 @@
                         </label>
                     `).join('');
 
-                    card.innerHTML = `
+card.innerHTML = `
                         <div class="trip-info">
                             <h4><i class="fa-solid fa-car"></i> Cab: ${trip.cab_reg_no}</h4>
                             <div class="trip-detail"><span>Trip ID:</span> <strong>${trip.trip_id}</strong></div>
                             <div class="trip-detail"><span>Emp:</span> <strong>${trip.employee_name} (${trip.employee_id})</strong></div>
+                            
+                            <div class="trip-detail" style="color: #616161; margin-top: 4px;">
+                                <span>Office:</span> <strong><i class="fa-regular fa-building"></i> ${trip.office || 'N/A'}</strong>
+                            </div>
                             
                             <div class="trip-detail" style="margin-top: 8px; color:#1565c0;">
                                 <i class="fa-solid fa-calendar-day"></i> Shift: <strong>${trip.shift_date} ${trip.shift_time}</strong>
