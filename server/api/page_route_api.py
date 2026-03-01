@@ -72,3 +72,35 @@ async def logout(request: Request):
 async def favicon():
     return Response(status_code=204) 
 
+from fastapi import APIRouter
+from fastapi.responses import FileResponse
+import os
+
+router = APIRouter()
+
+# Define the path to your client folder
+CLIENT_DIR = os.path.join(os.getcwd(), "..", "client")
+
+@router.get("/audit/mcd")
+async def serve_mcd():
+    return FileResponse(os.path.join(CLIENT_DIR, "AuditCorner", "audit_mcd.html"))
+
+@router.get("/audit/alt-vehicle")
+async def serve_alt():
+    return FileResponse(os.path.join(CLIENT_DIR, "AuditCorner", "audit_alt_vehicle.html"))
+
+@router.get("/audit/toll")
+async def serve_toll():
+    return FileResponse(os.path.join(CLIENT_DIR, "AuditCorner", "audit_toll.html"))
+
+@router.get("/audit/b2b")
+async def serve_b2b():
+    return FileResponse(os.path.join(CLIENT_DIR, "AuditCorner", "audit_b2b.html"))
+
+@router.get("/audit/vehicle")
+async def serve_veh():
+    return FileResponse(os.path.join(CLIENT_DIR, "AuditCorner", "audit_vehicle.html"))
+
+@router.get("/audit/incomplete")
+async def serve_incomplete():
+    return FileResponse(os.path.join(CLIENT_DIR, "AuditCorner", "audit_incomplete.html"))
