@@ -12,7 +12,7 @@ from starlette.middleware.sessions import SessionMiddleware
 # Internal Imports
 from database import create_db_and_tables, engine
 from admin import setup_admin
-from api import cleaner_api, locality_api, page_route_api, download_api, gps_api, b2b_api
+from api import cleaner_api, locality_api, page_route_api, download_api, gps_api, b2b_api, toll_api
 
 # --- 1. CONFIGURATION & PATHS ---
 BASE_DIR = Path(__file__).resolve().parent
@@ -26,7 +26,8 @@ DIRS = {
     "locality": CLIENT_DIR / "LocalityCorner",
     "components": CLIENT_DIR / "Components",
     "gps": CLIENT_DIR / "GPSCorner",
-    "b2b": CLIENT_DIR / "B2BCorner"
+    "b2b": CLIENT_DIR / "B2BCorner",
+    "toll": CLIENT_DIR / "Toll_routes"
 }
 
 # --- 2. LIFESPAN (Startup & Sequence Fix) ---
@@ -75,6 +76,7 @@ app.include_router(locality_api.router)
 app.include_router(download_api.router)
 app.include_router(gps_api.router)
 app.include_router(b2b_api.router)
+app.include_router(toll_api.router)
 
 # --- 5. STATIC FILES ---
 app.mount("/home-static", StaticFiles(directory=DIRS["home"]), name="home_static")
@@ -87,5 +89,6 @@ app.mount("/Components", StaticFiles(directory=DIRS["components"]), name="compon
 
 app.mount("/b2b-static", StaticFiles(directory=DIRS["b2b"]), name="b2b_static")
 app.mount("/gps-static", StaticFiles(directory=DIRS["gps"]), name="gps_static") 
+app.mount("/toll-static", StaticFiles(directory=DIRS["toll"]), name="toll_static") 
 
 setup_admin(app)

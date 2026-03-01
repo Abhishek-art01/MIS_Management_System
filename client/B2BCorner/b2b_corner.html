@@ -83,19 +83,43 @@
                             <div class="trip-side drop">
                                 <h4><i class="fa-solid fa-arrow-down"></i> DROP</h4>
                                 <div class="detail-row"><span>ID:</span> <strong>${drop.trip_id}</strong></div>
-                                <div class="detail-row"><span>Cab No:</span> <strong>${drop.cab_reg_no}</strong></div>
-                                <div class="detail-row"><span>Time:</span> <strong>${drop.shift_date} ${drop.shift_time}</strong></div>
+                                <div class="detail-row"><span>Cab:</span> <strong>${drop.cab_reg_no}</strong></div>
+                                <div class="detail-row"><span>Shift:</span> <strong>${drop.shift_date} ${drop.shift_time}</strong></div>
                                 <div class="detail-row"><span>Emp:</span> <strong>${drop.employee_name} (${drop.employee_id})</strong></div>
-                                <div class="detail-row" style="margin-top: 8px; color: #d84315;"><strong><i class="fa-solid fa-shield-halved"></i> Guard: ${drop.marshall || 'No'}</strong></div>
+                                
+                                <div class="detail-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #ffe082;">
+                                    <span style="color: #2e7d32;" title="Pickup Time"><i class="fa-solid fa-clock"></i> P: <strong>${drop.pickup_time || '--:--'}</strong></span>
+                                    <span style="color: #c62828;" title="Drop Time"><i class="fa-solid fa-clock"></i> D: <strong>${drop.drop_time || '--:--'}</strong></span>
+                                </div>
+                                
+                                <div style="margin-top: 6px; font-size: 0.8rem; color: #666; line-height: 1.3;">
+                                    <i class="fa-solid fa-map-location-dot"></i> ${drop.address || 'N/A'}
+                                </div>
+
+                                <div class="detail-row" style="margin-top: 10px; color: #d84315;">
+                                    <strong><i class="fa-solid fa-shield-halved"></i> Guard: ${drop.marshall || 'No'}</strong>
+                                </div>
                             </div>
                             
                             <div class="trip-side pickup">
                                 <h4><i class="fa-solid fa-arrow-up"></i> PICKUP</h4>
                                 <div class="detail-row"><span>ID:</span> <strong>${pick.trip_id}</strong></div>
-                                <div class="detail-row"><span>Cab No:</span> <strong>${pick.cab_reg_no}</strong></div>
-                                <div class="detail-row"><span>Time:</span> <strong>${pick.shift_date} ${pick.shift_time}</strong></div>
+                                <div class="detail-row"><span>Cab:</span> <strong>${pick.cab_reg_no}</strong></div>
+                                <div class="detail-row"><span>Shift:</span> <strong>${pick.shift_date} ${pick.shift_time}</strong></div>
                                 <div class="detail-row"><span>Emp:</span> <strong>${pick.employee_name} (${pick.employee_id})</strong></div>
-                                <div class="detail-row" style="margin-top: 8px; color: #1565c0;"><strong><i class="fa-solid fa-shield-halved"></i> Guard: ${pick.marshall || 'No'}</strong></div>
+                                
+                                <div class="detail-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #90caf9;">
+                                    <span style="color: #2e7d32;" title="Pickup Time"><i class="fa-solid fa-clock"></i> P: <strong>${pick.pickup_time || '--:--'}</strong></span>
+                                    <span style="color: #c62828;" title="Drop Time"><i class="fa-solid fa-clock"></i> D: <strong>${pick.drop_time || '--:--'}</strong></span>
+                                </div>
+
+                                <div style="margin-top: 6px; font-size: 0.8rem; color: #666; line-height: 1.3;">
+                                    <i class="fa-solid fa-map-location-dot"></i> ${pick.address || 'N/A'}
+                                </div>
+
+                                <div class="detail-row" style="margin-top: 10px; color: #1565c0;">
+                                    <strong><i class="fa-solid fa-shield-halved"></i> Guard: ${pick.marshall || 'No'}</strong>
+                                </div>
                             </div>
                         </div>
                         

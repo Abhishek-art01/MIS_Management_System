@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from fastapi import APIRouter, Request, Depends, Form, Response
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select, Session
 from fastapi.responses import FileResponse
@@ -69,3 +69,34 @@ async def serve_b2b_maker(request: Request):
     if not user:
         return RedirectResponse(url="/login", status_code=303)
     return FileResponse(CLIENT_DIR / "B2BCorner" / "b2b_corner.html")
+# --- INDIVIDUAL AUDIT PAGES (From Sidebar) ---
+
+@router.get("/audit/b2b")
+async def serve_b2b_page(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    # Points to the new B2B Maker UI we just created
+    return FileResponse(CLIENT_DIR / "B2BCorner" / "b2b_corner.html")
+
+
+@router.get("/audit/incomplete")
+async def serve_incomplete_page(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    # Since you haven't built this HTML yet, we return a temporary placeholder
+    return HTMLResponse(
+        "<div style='font-family: sans-serif; padding: 40px; text-align: center;'>"
+        "<h2>🚧 Incomplete Trips Page is Under Construction 🚧</h2>"
+        "<p>You will design this page next!</p>"
+        "</div>"
+    )
+@router.get("/audit/toll")
+async def serve_toll_page(request: Request):
+    user = request.session.get("user")
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    return FileResponse(CLIENT_DIR / "AuditCorner" / "audit_toll.html")

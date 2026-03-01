@@ -57,6 +57,7 @@ class TripDataBase(DynamicSQLModel):
     two_side: Optional[float] = None
     club_km: Optional[float] = None
     toll_km: Optional[float] = None
+    unique_toll_id: Optional[str] = None
     toll_amount: Optional[float] = None
     toll_name: Optional[str] = None
     b2b_deducted: Optional[float] = None
@@ -186,6 +187,42 @@ class T3RunningVehiclefeb2026(DynamicSQLModel, table=True):
     vehicle_driver_mobile: Optional[str] = None
     mcd: Optional[str] = None
     fastag: Optional[str] = None
+    
+# --- 9. TOLL / FASTAG DATA ---
+class TollData(DynamicSQLModel, table=True):
+    __tablename__ = "toll_data"
+    
+    # User Request: ID is NOT an int, but is unique. 
+    id: str = Field(primary_key=True, unique=True)
+    
+    veh: Optional[str] = None
+    date: Optional[str] = None
+    travel_date_time: Optional[str] = None
+    unique_transaction_id: Optional[str] = None
+    transaction_description: Optional[str] = None
+    
+    # Amount is best stored as a float to allow for calculations
+    amount: Optional[float] = None
+    
+    toll_id: Optional[str] = None
+    unique_id: Optional[str] = None
+    remark: Optional[str] = None
+
+class Toll_locality(DynamicSQLModel, table=True):
+    __tablename__ = "toll_locality"
+    
+    # User Request: ID is NOT an int, but is unique. 
+    id: str = Field(primary_key=True, unique=True)
+    
+    toll_id: Optional[str] = None
+    unique_id: Optional[str] = None
+    toll_name: Optional[str] = None
+    office: Optional[str] = None
+    landmark: Optional[str] = None
+    
+    # Amount is best stored as a float to allow for calculations
+    km: Optional[str] = None
+
 
 # --- Pydantic Schemas ---
 class LocalityMappingSchema(BaseModel):
@@ -212,3 +249,4 @@ class TableSchemaResponse(BaseModel):
     table_name: str
     columns: List[Dict[str, Any]]
     row_count: Optional[int] = None
+    

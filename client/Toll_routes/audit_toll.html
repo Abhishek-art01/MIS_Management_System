@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toll Audit Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/components-static/Sidebar.css">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .header { background: white; padding: 15px 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;}
+        .header h2 { margin: 0; font-size: 1.2rem; color: #1e88e5; }
+        
+        .grid-container { display: flex; flex-direction: column; gap: 15px; }
+        
+        .mapping-card { display: flex; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e0e0e0; }
+        
+        /* Left Side: Trip Details */
+        .trip-info { flex: 1; padding: 15px; background: #fffcf5; border-right: 2px dashed #e0e0e0; display: flex; flex-direction: column; gap: 6px; }
+        .trip-info h4 { margin: 0 0 10px 0; color: #d84315; font-size: 1rem; border-bottom: 1px solid #ffe082; padding-bottom: 5px; }
+        .trip-detail { font-size: 0.85rem; color: #555; }
+        .trip-detail strong { color: #000; }
+        .address-box { background: #fff; padding: 8px; border: 1px solid #f1e2b3; border-radius: 4px; font-size: 0.8rem; margin-top: 5px;}
+
+        /* Right Side: Toll Checkboxes */
+        .toll-options { flex: 1.2; padding: 15px; display: flex; flex-direction: column; gap: 10px; background: #f8fafc;}
+        .toll-options h4 { margin: 0 0 5px 0; color: #1565c0; font-size: 1rem; }
+        
+        .toll-item { 
+            display: flex; align-items: center; gap: 12px; 
+            background: white; padding: 10px 12px; border-radius: 6px; 
+            border: 1px solid #cbd5e1; cursor: pointer; transition: 0.2s;
+        }
+        .toll-item:hover { border-color: #3b82f6; background: #eff6ff; }
+        .toll-item input { transform: scale(1.3); cursor: pointer; }
+        
+        .toll-details { flex: 1; font-size: 0.85rem; line-height: 1.4; }
+        .toll-amount { font-weight: bold; color: #b91c1c; font-size: 1rem; background: #fee2e2; padding: 4px 8px; border-radius: 4px;}
+
+        .btn-save { background: #059669; color: white; border: none; padding: 10px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-top: 10px; font-size: 0.9rem;}
+        .btn-save:hover { background: #047857; }
+        .btn-refresh { background: #2563eb; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;}
+        
+        .loader { text-align: center; padding: 30px; color: #666; font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+    <div id="sidebar-target"></div>
+
+    <div class="dashboard-container" style="margin-left: 270px;">
+        <div class="header">
+            <h2><i class="fa-solid fa-road-barrier"></i> Fastag / Toll Mapper (± 1.5 Hrs)</h2>
+            <button class="btn-refresh" onclick="loadTollMatches()"><i class="fa-solid fa-rotate"></i> Refresh Matches</button>
+        </div>
+
+        <div id="mapping-grid" class="grid-container">
+            <div class="loader"><i class="fa-solid fa-spinner fa-spin"></i> Finding matching tolls based on time and vehicle...</div>
+        </div>
+    </div>
+
+    <script src="/components-static/Sidebar.js"></script>
+    <script>
+        async function loadTollMatches() {
+            const grid = document.getElementById('mapping-grid');
+            grid.innerHTML = '<div class="loader"><i class="fa-solid fa-spinner fa-spin"></i> Calculating matches...</div>';
+
+            try {
+                const response = await fetch('/api/toll/potential_matches');
+                const matches = await response.json();
+
+                grid.innerHTML = '';
+                if(matches.length === 0) {
+                    grid.innerHTML = '<div class="loader">No unmapped tolls found within a 1.5-hour window for existing trips! 🎉</div>';
+                    return;
+                }
+
+                matches.forEach(data => {
+                    const trip = data.trip;
+                    const tolls = data.tolls;
+                    
+                    const card = document.createElement('div');
+                    card.className = 'mapping-card';
+                    card.id = `card-${trip.unique_id}`;
+                    
+                    // Generate Toll Checkboxes (Unchecked by default)
+                    let tollsHtml = tolls.map(t => `
+                        <label class="toll-item">
+                            <input type="checkbox" class="toll-checkbox-${trip.unique_id}" value="${t.id}">
+                            <div class="toll-details">
+                                <strong style="color:#0f172a;"><i class="fa-regular fa-clock"></i> ${t.travel_date_time}</strong><br>
+                                <span style="color:#475569;">${t.transaction_description}</span>
+                            </div>
+                            <div class="toll-amount">₹${t.amount}</div>
+                        </label>
+                    `).join('');
+
+                    card.innerHTML = `
+                        <div class="trip-info">
+                            <h4><i class="fa-solid fa-car"></i> Cab: ${trip.cab_reg_no}</h4>
+                            <div class="trip-detail"><span>Trip ID:</span> <strong>${trip.trip_id}</strong></div>
+                            <div class="trip-detail"><span>Emp:</span> <strong>${trip.employee_name} (${trip.employee_id})</strong></div>
+                            
+                            <div class="trip-detail" style="margin-top: 8px; color:#1565c0;">
+                                <i class="fa-solid fa-calendar-day"></i> Shift: <strong>${trip.shift_date} ${trip.shift_time}</strong>
+                            </div>
+                            
+                            <div class="trip-detail" style="display:flex; gap: 15px; margin-top: 4px;">
+                                <span style="color: #059669;"><i class="fa-solid fa-arrow-up"></i> P: <strong>${trip.pickup_time || '--:--'}</strong></span>
+                                <span style="color: #dc2626;"><i class="fa-solid fa-arrow-down"></i> D: <strong>${trip.drop_time || '--:--'}</strong></span>
+                            </div>
+
+                            <div class="address-box">
+                                <strong><i class="fa-solid fa-map-pin" style="color:red;"></i> ${trip.landmark || 'No Landmark'}</strong><br>
+                                <span style="color:#666;">${trip.address}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="toll-options">
+                            <h4><i class="fa-solid fa-receipt"></i> Discovered Tolls (±1.5h)</h4>
+                            ${tollsHtml}
+                            <button class="btn-save" onclick="saveTolls('${trip.unique_id}')">
+                                <i class="fa-solid fa-link"></i> Link Selected Tolls
+                            </button>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+
+            } catch(e) {
+                grid.innerHTML = '<div class="loader" style="color:red;">Error loading Toll data. Check Terminal logs.</div>';
+            }
+        }
+
+        async function saveTolls(tripUniqueId) {
+            const checkboxes = document.querySelectorAll(`.toll-checkbox-${tripUniqueId}:checked`);
+            const selectedTollIds = Array.from(checkboxes).map(cb => cb.value);
+
+            if (selectedTollIds.length === 0) {
+                alert("Please select at least one toll to link!");
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/toll/mark', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        trip_unique_id: tripUniqueId, 
+                        selected_toll_ids: selectedTollIds 
+                    })
+                });
+                
+                if (response.ok) {
+                    document.getElementById(`card-${tripUniqueId}`).remove(); // Instantly hide mapped row
+                } else {
+                    alert("Failed to link tolls. Check server logs.");
+                }
+            } catch (e) {
+                alert("Connection Error");
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadTollMatches);
+    </script>
+</body>
+</html>
