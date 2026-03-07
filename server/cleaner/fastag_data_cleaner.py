@@ -298,7 +298,7 @@ def _process_idfcb(pdf_obj):
             raw_val = str(df.iat[1, 3])
             if raw_val and raw_val.lower() != 'nan':
                 vehicle_val = raw_val.replace("\n", "").replace(" ", "").strip()
-    except Exception as e:
+    except Exception:
         pass
 
     if len(df) > 5:
@@ -306,37 +306,51 @@ def _process_idfcb(pdf_obj):
     else:
         return pd.DataFrame()
 
-    df.columns = df.iloc[0]
-    df = df[1:].reset_index(drop=True)
-    df.columns = _clean_columns(df.columns) 
-    
-    rename_map = {
-        "reader_date_time": "travel_date_time",
-        "debit": "tag_debit_credit",
-        "activity": "activity",
-        "description": "plaza_name", 
-        "transaction_description": "plaza_name",
-        "sequence_no": "unique_transaction_id", 
-        "urn": "unique_transaction_id" 
-    }
-    
-    final_rename = {}
-    for col in df.columns:
-        for k, v in rename_map.items():
-            if k in col.lower():
-                final_rename[col] = v
-    df.rename(columns=final_rename, inplace=True)
+    # ── FIX: skip the corrupted header row entirely ──────────────────────────
+    # IDFCB always has exactly 9 columns in a fixed order regardless of OCR quality.
+    # Assign names positionally so corrupted text ("dae tme", "Transacton") is ignored.
+    IDFCB_COLS = [
+        "Travel Date Time",        # col 0 – Reader date time
+        "processed_date_time",     # col 1 – Processed date time (internal, dropped later)
+        "Unique Transaction ID",   # col 2
+        "Plaza Name",              # col 3
+        "Plaza ID",                # col 4
+        "Activity",                # col 5
+        "credit",                  # col 6
+        "Tag Dr/Cr",               # col 7 – Debit amount
+        "closing_tag_balance",     # col 8 – dropped later
+    ]
 
-    cols_to_clean = [c for c in df.columns if "amount" in c or "balance" in c or "debit" in c]
-    for c in cols_to_clean:
-        df[c] = df[c].astype(str).str.replace("Dr", "", regex=False).str.replace("Cr", "", regex=False).str.replace(",", "", regex=False).str.strip() 
+    # Skip the first row (it's the header we no longer need)
+    df = df.iloc[1:].reset_index(drop=True)
 
-    if "activity" in df.columns:
-        df["activity"] = df["activity"].astype(str).str.strip()
-        act_lower = df["activity"].str.lower()
+    if df.shape[1] == len(IDFCB_COLS):
+        df.columns = IDFCB_COLS
+    elif df.shape[1] > len(IDFCB_COLS):
+        # Extra columns possible on some extractions – assign what we can, drop rest
+        df = df.iloc[:, :len(IDFCB_COLS)]
+        df.columns = IDFCB_COLS
+    else:
+        # Unexpected shape – fall back gracefully
+        df.columns = _clean_columns(df.columns)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # Clean numeric columns
+    for c in ["Tag Dr/Cr", "credit", "closing_tag_balance"]:
+        if c in df.columns:
+            df[c] = (df[c].astype(str)
+                         .str.replace("Dr", "", regex=False)
+                         .str.replace("Cr", "", regex=False)
+                         .str.replace(",", "", regex=False)
+                         .str.strip())
+
+    # Drop recharge / non-toll rows
+    if "Activity" in df.columns:
+        df["Activity"] = df["Activity"].astype(str).str.strip()
+        act_lower = df["Activity"].str.lower()
         mask_junk = (
-            act_lower.str.contains("recharge", na=False) | 
-            act_lower.str.contains("ccavenue", na=False) | 
+            act_lower.str.contains("recharge", na=False) |
+            act_lower.str.contains("ccavenue", na=False) |
             act_lower.str.contains("rec harge", na=False) |
             act_lower.isin(["none", "nan", ""])
         )
@@ -344,23 +358,28 @@ def _process_idfcb(pdf_obj):
 
     df = clean_multiline_cells(df)
 
-    final_title_map = {
-        "travel_date_time": "Travel Date Time",
-        "unique_transaction_id": "Unique Transaction ID",
-        "plaza_name": "Plaza Name",
-        "plaza_id": "Plaza ID",
-        "activity": "Activity",
-        "tag_debit_credit": "Tag Dr/Cr"
-    }
-    df.rename(columns=final_title_map, inplace=True)
-
     df["Vehicle No"] = vehicle_val
     df = df[df.isna().sum(axis=1) <= 2]
 
-    return df
+    # Drop internal-only columns
+    df.drop(columns=["processed_date_time", "closing_tag_balance", "credit"],
+            errors="ignore", inplace=True)
 
+    # Robust date parsing
+    if "Travel Date Time" in df.columns:
+        df["Travel Date Time"] = (df["Travel Date Time"]
+            .astype(str)
+            .str.replace(r'\s*\n+\s*', ' ', regex=True)
+            .str.strip()
+            .replace({"NA": "", "nan": "", "None": ""}))
+        df["Travel Date Time"] = pd.to_datetime(df["Travel Date Time"], errors='coerce')
+
+    return df
 # ==========================================
 # HELPER: INDUS SPECIFIC CLEANER
+# ==========================================
+# ==========================================
+# HELPER: INDUS SPECIFIC CLEANER (UNIFIED FORMATS)
 # ==========================================
 def _process_indus(pdf_obj):
     all_tables = []
@@ -374,102 +393,103 @@ def _process_indus(pdf_obj):
         return pd.DataFrame()
 
     df = pd.concat(all_tables, ignore_index=True)
-    df = df.dropna(how="all")
-
-    df.columns = df.iloc[0]
-    df = df[1:].reset_index(drop=True)
-
-    def clean_columns(columns):
-        return (
-            columns.astype(str)
-            .str.replace(r"\n", " ", regex=True)
-            .str.replace(r"\t", " ", regex=True)
-            .str.replace(r"\s+", " ", regex=True)
-            .str.strip()
-            .str.lower()
-            .str.replace(r"[^\w\s]", "", regex=True)
-            .str.replace(" ", "_")
-        )
-
-    df.columns = clean_columns(df.columns)
-    df.columns = df.columns.str.strip().str.lower()
-
-    rename_map = {
-        "transaction_datetime": "travel_date_time",
-        "transactiondtstamp": "unique_transaction_id",
-        "type": "activity",
-        "description": "plaza_name",
-        "debit": "tag_debit_credit",
-        "vehiclenumber": "vehicle_number",
-    }
-    df = df.rename(columns=rename_map)
-    df = df.drop(columns=["credit", "balance"], errors="ignore")
-
-    if "plaza_id" not in df.columns:
-        df["plaza_id"] = ""
-
-    final_cols = ["vehicle_number", "travel_date_time", "unique_transaction_id", "plaza_name", "plaza_id", "activity", "tag_debit_credit"]
-    df = df[[c for c in final_cols if c in df.columns]]
-
-    if "activity" in df.columns:
-        df["activity"] = df["activity"].astype(str).str.strip()
-        df = df[~df["activity"].str.lower().isin(["recharge", "type", "none", "nan"])]
-
-    df = df.replace(r"^\s*$", np.nan, regex=True)
-    df = df.reset_index(drop=True)
-
-    # A) Merge AM/PM split rows
-    if "travel_date_time" in df.columns:
-        for i in range(1, len(df)):
-            val = str(df.at[i, "travel_date_time"]) if pd.notna(df.at[i, "travel_date_time"]) else ""
-            if val.lower() in ["am", "pm"]:
-                prev_val = str(df.at[i - 1, "travel_date_time"]) if pd.notna(df.at[i - 1, "travel_date_time"]) else ""
-                df.at[i - 1, "travel_date_time"] = (prev_val + " " + val).strip()
-                df.at[i, "travel_date_time"] = np.nan
-
-    # B) Merge Split Plaza Names
-    important_cols = ["vehicle_number", "travel_date_time", "unique_transaction_id", "activity", "tag_debit_credit"]
-    existing_important = [c for c in important_cols if c in df.columns]
-    
-    if "plaza_name" in df.columns and existing_important:
-        for i in range(1, len(df)):
-            if pd.notna(df.at[i, "plaza_name"]) and df.loc[i, existing_important].isna().all():
-                prev_plaza = str(df.at[i - 1, "plaza_name"]) if pd.notna(df.at[i - 1, "plaza_name"]) else ""
-                curr_plaza = str(df.at[i, "plaza_name"])
-                df.at[i - 1, "plaza_name"] = (prev_plaza + " " + curr_plaza).strip()
-                df.at[i, "plaza_name"] = np.nan
-
     df = df.dropna(how="all").reset_index(drop=True)
 
-    if "travel_date_time" in df.columns:
-        df["travel_date_time"] = (
-            df["travel_date_time"].astype(str)
-            .str.replace(r"\s*\n\s*", " ", regex=True)
-            .str.replace(r"\s+", " ", regex=True)
-            .str.strip()
-        )
-        df["travel_date_time"] = pd.to_datetime(df["travel_date_time"], dayfirst=True, errors="coerce")
+    # 1. Dynamically Locate Header Row (Works for both formats)
+    header_idx = -1
+    for i in range(min(30, len(df))):
+        row_str = "".join([str(x).lower() for x in df.iloc[i] if pd.notna(x)])
+        # Indus tables always have 'debit' and either 'vehicle' or 'description' or 'dtstamp'
+        if "debit" in row_str and ("vehicle" in row_str or "description" in row_str or "dtstamp" in row_str):
+            header_idx = i
+            break
 
-    if "plaza_name" in df.columns:
-        df["plaza_name"] = (
-            df["plaza_name"].astype(str)
-            .str.replace(r"\s*\n\s*", " ", regex=True)
-            .str.replace(r"\s+", " ", regex=True)
-            .str.strip()
-        )
+    if header_idx == -1:
+        return pd.DataFrame()
 
-    final_title_map = {
-        "vehicle_number": "Vehicle No",
-        "travel_date_time": "Travel Date Time",
-        "unique_transaction_id": "Unique Transaction ID",
-        "plaza_name": "Plaza Name",
-        "plaza_id": "Plaza ID",
-        "activity": "Activity",
-        "tag_debit_credit": "Tag Dr/Cr"
-    }
-    df.rename(columns=final_title_map, inplace=True)
+    df.columns = df.iloc[header_idx]
+    df = df.iloc[header_idx + 1:].reset_index(drop=True)
 
-    return df
+    # 2. Aggressive Column Cleanup
+    df.columns = [re.sub(r"[^a-zA-Z0-9]", "", str(c)).lower() for c in df.columns]
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+
+    # 3. Smart Column Mapping
+    col_map = {}
+    for col in df.columns:
+        c = str(col)
+        if "unique" in c or "dtstamp" in c or "stamp" in c:
+            col_map[col] = "Unique Transaction ID"
+        elif "vehicleno" in c or "vehicle" in c:
+            col_map[col] = "Vehicle No"
+        elif "datetime" in c or "date" in c or "time" in c or c == "transaction":
+            # Only map the first one found to avoid overwriting
+            if "Travel Date Time" not in col_map.values():
+                col_map[col] = "Travel Date Time"
+        elif "description" in c:
+            col_map[col] = "Plaza Name"
+        elif "type" in c or "activity" in c:
+            col_map[col] = "Activity"
+        elif "debit" in c or "amount" in c:
+            if "credit" not in c and "bal" not in c:
+                col_map[col] = "Tag Dr/Cr"
+
+    df.rename(columns=col_map, inplace=True)
+
+    # Enforce exact final columns
+    for col in ["Unique Transaction ID", "Travel Date Time", "Plaza Name", "Vehicle No", "Tag Dr/Cr", "Activity", "Plaza ID"]:
+        if col not in df.columns:
+            df[col] = ""
+
+    # 4. Handle "AM"/"PM" split rows (Common when pdfplumber misreads Indus PDFs)
+    for i in range(1, len(df)):
+        dt_val = str(df.at[i, "Travel Date Time"]).strip().upper()
+        if dt_val in ["AM", "PM"]:
+            prev_dt = str(df.at[i - 1, "Travel Date Time"]).strip()
+            df.at[i - 1, "Travel Date Time"] = f"{prev_dt} {dt_val}"
+            df.at[i, "Travel Date Time"] = np.nan
+
+    # 5. Initial Junk Filtering
+    df["Activity"] = df["Activity"].astype(str).str.strip()
+    mask_junk = df["Activity"].str.lower().isin(
+        ["recharge", "reload", "type", "type_of_transaction", "none", "nan", ""]
+    )
+    df = df[~mask_junk].reset_index(drop=True)
+
+    # 6. Validate Vehicle Number
+    # Drop rows where Vehicle No doesn't look like a standard Indian plate (e.g. headers bleeding over)
+    df = df[df["Vehicle No"].astype(str).str.replace(r"\s+", "", regex=True).str.upper().str.match(r"^[A-Z]{2}\d{1,2}[A-Z]{0,3}\d{4}$", na=False)]
+
+    # 7. Extract Exact Plaza Name
+    def extract_plaza(val):
+        if pd.isna(val): return ""
+        s = str(val).replace("\n", " ").strip()
+        # Format B: "Plaza Name : Bijwasan"
+        if ":" in s:
+            s = s.split(":", 1)[-1].strip()
+        # Format A: "Toll Debit-Bijwasan"
+        elif "-" in s:
+            s = s.split("-", 1)[-1].strip()
+        return s
+    df["Plaza Name"] = df["Plaza Name"].apply(extract_plaza)
+
+    # 8. Clean IDs
+    # Removes leading apostrophes (e.g. '536647013...), spaces, and newlines
+    df["Unique Transaction ID"] = df["Unique Transaction ID"].astype(str).str.replace(r"['\n\s]+", "", regex=True)
+
+    # 9. Clean Amounts and Filter Valid Tolls
+    df["Tag Dr/Cr"] = pd.to_numeric(df["Tag Dr/Cr"].astype(str).str.replace(r"[^\d\.]", "", regex=True), errors='coerce').fillna(0)
+    df = df[df["Tag Dr/Cr"] > 0] # Strict filter for Debits only
+
+    # 10. Clean Date Formatting (Stitch split date and time back together)
+    df["Travel Date Time"] = df["Travel Date Time"].astype(str).str.replace(r"[\n\s]+", " ", regex=True).str.strip()
+
+    df["Activity"] = "Toll Payment"
+
+    df = df.dropna(subset=["Unique Transaction ID"])
+    df = df[(df["Unique Transaction ID"] != "") & (df["Unique Transaction ID"].str.lower() != "nan")]
+
+    return df[["Vehicle No", "Travel Date Time", "Unique Transaction ID", "Plaza Name", "Plaza ID", "Activity", "Tag Dr/Cr"]]
 
 # ==========================================
 # HELPER: SBI SPECIFIC CLEANER (Smart Extractor)
@@ -593,66 +613,66 @@ import re
 # ==========================================
 # HELPER: AMAZON PAY SPECIFIC CLEANER (FLATTENED REGEX)
 # ==========================================
-import re
-import pandas as pd
-
 def _process_amazon(pdf_obj):
     all_rows = []
     
-    # 1. Flatten all pages into one continuous string to ignore line breaks 
     full_text = ""
     for page in pdf_obj.pages:
         page_text = page.extract_text()
         if page_text:
             full_text += " " + page_text
     
-    # Normalize whitespace
     clean_text = re.sub(r'\s+', ' ', full_text)
 
-    # 2. Step 1: Identify the "Anchor" (Date + Time + Vehicle)
-    # This splits the text into individual transaction blocks
-    anchor_pattern = r"(\d{1,2}\s+[A-Za-z]{3}\s+\d{4}\s+\d{2}:\d{2}\s+[APM]{2}\s+HR84A9525)"
+    # ── FIX: dynamic VRN pattern instead of hardcoded "HR84A9525" ──────────
+    # Indian VRN format: 2 letters + 2 digits + 1-2 letters + 4 digits  (e.g. HR38AK8732, HR84A9525)
+    VRN_PATTERN = r"[A-Z]{2}\d{2}[A-Z]{1,2}\d{4}"
+    anchor_pattern = rf"(\d{{1,2}}\s+[A-Za-z]{{3}}\s+\d{{4}}\s+\d{{2}}:\d{{2}}\s+[APM]{{2}}\s+{VRN_PATTERN})"
+    # ────────────────────────────────────────────────────────────────────────
+
     blocks = re.split(anchor_pattern, clean_text)
     
-    # The first element is usually header noise, so we skip it
     for i in range(1, len(blocks), 2):
-        header = blocks[i]      # Contains: Date, Time, Vehicle
-        content = blocks[i+1]   # Contains: Plaza, Charge ID, Amount
+        header  = blocks[i]
+        content = blocks[i+1] if i+1 < len(blocks) else ""
         
-        # Extract components from Header
-        header_parts = re.search(r"(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})\s+(\d{2}:\d{2}\s+[APM]{2})\s+(HR84A9525)", header)
+        header_parts = re.search(
+            rf"(\d{{1,2}}\s+[A-Za-z]{{3}}\s+\d{{4}})\s+(\d{{2}}:\d{{2}}\s+[APM]{{2}})\s+({VRN_PATTERN})",
+            header
+        )
         if not header_parts:
             continue
             
         date_str, time_str, vehicle = header_parts.groups()
 
-        # Step 2: Extract ID and Amount from the Content block
-        # Look for the Charge ID (P04...) 
-        id_match = re.search(r"(P04-\d{7}-\d{7})", content)
-        txn_id = id_match.group(1) if id_match else "N/A"
+        id_match     = re.search(r"(P04-\d{7}-\d{7})", content)
+        txn_id       = id_match.group(1) if id_match else "N/A"
         
-        # Look for the Amount (Rs. XXX.X) 
         amount_match = re.search(r"Rs\.?\s*([\d\.]+)", content)
-        amount = amount_match.group(1) if amount_match else "0.0"
+        amount       = amount_match.group(1) if amount_match else "0.0"
 
-        # The Plaza Name is everything in the content BEFORE the ID or Amount
+        # Skip Rs. 0.0 rows (no Charge ID = failed/free trip)
+        if float(amount) == 0.0 or txn_id == "N/A":
+            continue
+
         plaza_raw = re.split(r"P04-|Rs\.", content)[0].strip()
 
         all_rows.append({
-            "Vehicle No": vehicle,
-            "Travel Date Time": f"{date_str} {time_str}",
+            "Vehicle No":           vehicle,
+            "Travel Date Time":     f"{date_str} {time_str}",
             "Unique Transaction ID": txn_id,
-            "Plaza Name": plaza_raw,
-            "Plaza ID": "",
-            "Activity": "Toll Payment",
-            "Tag Dr/Cr": amount
+            "Plaza Name":           plaza_raw,
+            "Plaza ID":             "",
+            "Activity":             "Toll Payment",
+            "Tag Dr/Cr":            amount
         })
 
     if not all_rows:
         return pd.DataFrame()
 
     df = pd.DataFrame(all_rows)
-    return df[["Vehicle No", "Travel Date Time", "Unique Transaction ID", "Plaza Name", "Plaza ID", "Activity", "Tag Dr/Cr"]]
+    return df[["Vehicle No", "Travel Date Time", "Unique Transaction ID",
+               "Plaza Name", "Plaza ID", "Activity", "Tag Dr/Cr"]]
 # ==========================================
 # HELPER: AXIS BANK SPECIFIC CLEANER
 # ==========================================
@@ -957,12 +977,20 @@ def process_fastag_data(file_data_list):
             final_df = final_df[~mask]
             final_df["Travel Date Time"] = final_df["Travel Date Time"].astype(str).str.replace("/", "-", regex=False)
             
-            # 🔥 THE FIX: Use apply() to parse mixed date formats row-by-row safely
+            # 🔥 THE FIX: Smarter Date Parser to prevent month/day flipping
             def safe_parse_date(val):
-                if pd.isna(val) or str(val).strip() == "":
+                if pd.isna(val) or str(val).strip() in ["", "nan", "None", "NaT"]:
                     return pd.NaT
+                
+                val_str = str(val).strip()
+                
                 try:
-                    return pd.to_datetime(val, dayfirst=True)
+                    # If a helper already formatted it as YYYY-MM-DD, parse it normally
+                    if re.match(r"^\d{4}-\d{2}-\d{2}", val_str):
+                        return pd.to_datetime(val_str) # No dayfirst=True here!
+                    else:
+                        # If it's a raw Indian format (DD-MM-YYYY), enforce dayfirst
+                        return pd.to_datetime(val_str, dayfirst=True)
                 except:
                     return pd.NaT
 
@@ -970,7 +998,6 @@ def process_fastag_data(file_data_list):
             
             # Convert back to standard string format, leaving invalid dates blank
             final_df["Travel Date Time"] = final_df["Travel Date Time"].dt.strftime('%d-%m-%Y %H:%M:%S').fillna("")
-        # ----------------------------------------------------
 
         final_df["Vehicle No"] = (
             final_df["Vehicle No"].astype(str)

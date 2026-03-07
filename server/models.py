@@ -14,13 +14,14 @@ class User(DynamicSQLModel, table=True):
     username: str = Field(index=True, unique=True)
     password_hash: str
 
+
 class TripDataBase(DynamicSQLModel):
     id: Optional[int] = Field(default=None, primary_key=True)
     unique_id: str = Field(index=True, unique=True)
-    
-    # ... (Your existing fields remain the same) ...
+
     shift_date: Optional[str] = None
     trip_direction: Optional[str] = None
+    route_no: Optional[str] = None
     trip_id: Optional[str] = None
     flight_number: Optional[str] = None
     employee_id: Optional[str] = None
@@ -37,8 +38,7 @@ class TripDataBase(DynamicSQLModel):
     vendor: Optional[str] = None
     office: Optional[str] = None
     mis_remark: Optional[str] = None
-    
-    # Special columns
+
     trip_date: Optional[str] = None
     data_source: Optional[str] = None
     pickup_time: Optional[str] = None
@@ -51,17 +51,25 @@ class TripDataBase(DynamicSQLModel):
     gps_time: Optional[str] = None
     gps_remark: Optional[str] = None
     claim_status: Optional[str] = None
+
     staff_count: Optional[int] = None
     billable_count: Optional[int] = None
-    one_side: Optional[float] = None
+
+    one_side: Optional[str] = None
     two_side: Optional[float] = None
     club_km: Optional[float] = None
     toll_km: Optional[float] = None
-    unique_toll_id: Optional[str] = None
-    toll_amount: Optional[float] = None
-    toll_name: Optional[str] = None
-    b2b_deducted: Optional[float] = None
     total_km: Optional[float] = None
+
+    unique_toll_id: Optional[str] = None
+    unique_toll_trn_id: Optional[str] = None
+    travel_date_time: Optional[str] = None
+
+    toll_name: Optional[str] = None
+    toll_amount: Optional[float] = None
+    total_amount: Optional[float] = None
+
+    b2b_deducted: Optional[float] = None
 
 class TripDataFile(DynamicSQLModel):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -188,25 +196,29 @@ class T3RunningVehiclefeb2026(DynamicSQLModel, table=True):
     mcd: Optional[str] = None
     fastag: Optional[str] = None
     
-# --- 9. TOLL / FASTAG DATA ---
+from typing import Optional
+from sqlmodel import Field
+
 class TollData(DynamicSQLModel, table=True):
     __tablename__ = "toll_data"
-    
-    # User Request: ID is NOT an int, but is unique. 
+
+    # ID is a string primary key
     id: str = Field(primary_key=True, unique=True)
-    
+
     veh: Optional[str] = None
+    owner_type: Optional[str] = None
     date: Optional[str] = None
     travel_date_time: Optional[str] = None
     unique_transaction_id: Optional[str] = None
     transaction_description: Optional[str] = None
-    
-    # Amount is best stored as a float to allow for calculations
+    activity: Optional[str] = None
+
     amount: Optional[float] = None
-    
+
     toll_id: Optional[str] = None
     unique_id: Optional[str] = None
     remark: Optional[str] = None
+    toll_una: Optional[str] = None
 
 class Toll_locality(DynamicSQLModel, table=True):
     __tablename__ = "toll_locality"

@@ -1,404 +1,756 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS Manager Dashboard</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GPS Corner · Ops</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/components-static/Sidebar.css">
+<script src="/components-static/Sidebar.js"></script>
+<style>
+/* ─── TOKENS ─────────────────────────────────────────── */
+:root{
+  --bg0:#0b0e13;
+  --bg1:#10141c;
+  --bg2:#141922;
+  --bg3:#1a2030;
+  --bg4:#212840;
+  --line:#252d3e;
+  --line2:#2e3a52;
 
-    <link rel="stylesheet" href="/gps-static/gps_corner.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  --teal:#2dd4bf;
+  --teal2:rgba(45,212,191,.12);
+  --teal3:rgba(45,212,191,.06);
+  --green:#4ade80;
+  --green2:rgba(74,222,128,.1);
+  --amber:#fbbf24;
+  --amber2:rgba(251,191,36,.1);
+  --red:#f87171;
+  --red2:rgba(248,113,113,.1);
+  --violet:#a78bfa;
+  --violet2:rgba(167,139,250,.1);
 
-    <link rel="stylesheet" href="/components-static/Sidebar.css">
-    <script src="/components-static/Sidebar.js"></script>
+  --t1:#e2e8f0;
+  --t2:#8899b0;
+  --t3:#4a5a72;
 
-    <style>
-        /* --- TAB STYLES (Internal for simplicity) --- */
-        .tabs-header {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #e0e0e0;
-        }
+  --r:8px;
+  --sans:'DM Sans',sans-serif;
+  --mono:'JetBrains Mono',monospace;
+  --shadow:0 2px 16px rgba(0,0,0,.4);
+}
 
-        .tab-btn {
-            padding: 12px 25px;
-            font-size: 1rem;
-            font-weight: 600;
-            border: none;
-            background: none;
-            cursor: pointer;
-            color: #666;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s ease;
-        }
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{font-family:var(--sans);background:var(--bg0);color:var(--t1);font-size:13.5px;line-height:1.5;}
 
-        .tab-btn:hover {
-            color: #333;
-            background-color: #f9f9f9;
-        }
+/* ─── TOPBAR ─────────────────────────────────────────── */
+.topbar{
+  position:sticky;top:0;z-index:300;
+  height:50px;
+  background:rgba(11,14,19,.97);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:12px;
+  padding:0 20px;
+}
+.brand{
+  font-family:var(--mono);font-size:.78rem;font-weight:600;
+  color:var(--teal);letter-spacing:.8px;
+  display:flex;align-items:center;gap:8px;flex-shrink:0;
+}
+.brand-pulse{
+  width:8px;height:8px;background:var(--teal);border-radius:50%;
+  box-shadow:0 0 0 0 rgba(45,212,191,.5);
+  animation:heartbeat 2s infinite;
+}
+@keyframes heartbeat{
+  0%,100%{box-shadow:0 0 0 0 rgba(45,212,191,.5);}
+  50%{box-shadow:0 0 0 6px rgba(45,212,191,0);}
+}
+.topbar-spacer{flex:1;}
+.topbar-stats{
+  display:flex;align-items:center;gap:0;
+  font-family:var(--mono);font-size:.7rem;
+}
+.ts{
+  padding:0 14px;border-right:1px solid var(--line);
+  color:var(--t3);display:flex;align-items:center;gap:5px;
+  white-space:nowrap;
+}
+.ts:last-child{border-right:none;}
+.ts b{color:var(--t1);}
+.ts .dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.topbar-actions{display:flex;gap:6px;align-items:center;}
+.btn{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:6px 13px;border:none;border-radius:6px;
+  cursor:pointer;font-family:var(--sans);font-size:.76rem;font-weight:600;
+  transition:all .15s;white-space:nowrap;
+}
+.btn-teal{background:var(--teal);color:#0b0e13;}
+.btn-teal:hover{background:#5eead4;}
+.btn-ghost{background:transparent;color:var(--t2);border:1px solid var(--line);}
+.btn-ghost:hover{background:var(--bg3);color:var(--t1);border-color:var(--line2);}
+.btn-sm{padding:4px 10px;font-size:.72rem;}
 
-        .tab-btn.active {
-            color: #1e88e5;
-            /* Blue */
-            border-bottom: 3px solid #1e88e5;
-        }
+/* ─── FILTER DRAWER ──────────────────────────────────── */
+.filter-drawer{
+  background:var(--bg1);border-bottom:1px solid var(--line);
+  padding:10px 20px;
+  display:none;align-items:center;gap:8px;flex-wrap:wrap;
+}
+.filter-drawer.open{display:flex;}
+.fi,.fs{
+  background:var(--bg0);border:1px solid var(--line);color:var(--t1);
+  padding:6px 10px;border-radius:6px;font-size:.76rem;font-family:var(--sans);
+  outline:none;transition:border-color .15s;min-width:130px;
+}
+.fi::placeholder{color:var(--t3);}
+.fi:focus,.fs:focus{border-color:var(--teal);}
 
-        /* Badge inside tab */
-        .tab-count {
-            background: #eee;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 0.8rem;
-            margin-left: 8px;
-            color: #333;
-        }
+/* ─── TABS ───────────────────────────────────────────── */
+.tabs-bar{
+  background:var(--bg1);border-bottom:1px solid var(--line);
+  display:flex;align-items:stretch;padding:0 20px;gap:4px;
+}
+.tab-btn{
+  display:flex;align-items:center;gap:7px;
+  padding:11px 16px;border:none;background:none;
+  border-bottom:2px solid transparent;margin-bottom:-1px;
+  color:var(--t2);font-family:var(--sans);font-size:.8rem;font-weight:600;
+  cursor:pointer;transition:color .15s,border-color .15s;
+}
+.tab-btn:hover{color:var(--t1);}
+.tab-btn.on{color:var(--teal);border-bottom-color:var(--teal);}
+.tc{
+  font-family:var(--mono);font-size:.64rem;font-weight:600;
+  padding:1px 7px;border-radius:20px;
+  background:var(--bg3);color:var(--t3);border:1px solid var(--line);
+}
+.tab-btn.on .tc{background:var(--teal2);color:var(--teal);border-color:rgba(45,212,191,.3);}
 
-        .tab-btn.active .tab-count {
-            background: #e3f2fd;
-            color: #1e88e5;
-        }
+/* ─── PAGE VIEWS ─────────────────────────────────────── */
+.pview{display:none;}
+.pview.on{display:block;}
+.cards-area{padding:14px 20px;display:flex;flex-direction:column;gap:10px;}
 
-        /* Hide sections by default */
-        .tab-content {
-            display: none;
-            animation: fadeIn 0.3s ease-in-out;
-        }
+/* ─── PAGINATION BAR ─────────────────────────────────── */
+.pgbar{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  background:var(--bg1);border:1px solid var(--line);border-radius:var(--r);
+  padding:9px 14px;
+}
+.pg-info{
+  font-family:var(--mono);font-size:.72rem;color:var(--t3);
+  display:flex;align-items:center;gap:8px;
+}
+.pg-info b{color:var(--teal);}
+.pg-btns{display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
+.pgb{
+  display:inline-flex;align-items:center;justify-content:center;gap:4px;
+  min-width:32px;height:28px;padding:0 8px;
+  border:1px solid var(--line);border-radius:5px;
+  background:var(--bg2);color:var(--t2);
+  font-family:var(--sans);font-size:.72rem;font-weight:600;
+  cursor:pointer;transition:all .12s;
+}
+.pgb:hover:not(:disabled){background:var(--bg3);color:var(--t1);border-color:var(--line2);}
+.pgb:disabled{opacity:.3;cursor:not-allowed;}
+.pgb.cur{background:var(--teal2);color:var(--teal);border-color:rgba(45,212,191,.4);}
+.pg-dots{color:var(--t3);font-size:.8rem;padding:0 2px;line-height:28px;}
+.pg-jump{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.7rem;color:var(--t3);}
+.pg-jump input{
+  width:48px;text-align:center;background:var(--bg0);border:1px solid var(--line);
+  color:var(--t1);padding:4px 6px;border-radius:5px;font-family:var(--mono);font-size:.7rem;outline:none;
+}
+.pg-jump input:focus{border-color:var(--teal);}
 
-        .tab-content.active {
-            display: grid;
-            /* Matches your grid layout */
-        }
+/* ─── TRIP CARD ──────────────────────────────────────── */
+.card{
+  background:var(--bg1);border:1px solid var(--line);border-radius:var(--r);
+  overflow:hidden;transition:border-color .18s,box-shadow .18s;
+  animation:pop .18s ease both;
+}
+@keyframes pop{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+.card:hover{border-color:var(--line2);box-shadow:var(--shadow);}
+.card.linked{border-color:rgba(167,139,250,.25);}
+.card.gps-on{border-color:rgba(74,222,128,.2);}
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(5px);
-            }
+/* CARD HEAD */
+.ch{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--line);
+  flex-wrap:wrap;gap:6px;
+}
+.chl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.tid{
+  font-family:var(--mono);font-size:.7rem;font-weight:600;color:var(--t3);
+  background:var(--bg0);padding:2px 8px;border-radius:4px;border:1px solid var(--line);
+}
+.cnum{font-family:var(--mono);font-size:.76rem;font-weight:600;color:var(--t1);display:flex;align-items:center;gap:4px;}
+.cdate{font-size:.72rem;color:var(--t3);display:flex;align-items:center;gap:4px;}
+.chr{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.badge{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:2px 8px;border-radius:20px;
+  font-family:var(--mono);font-size:.62rem;font-weight:600;letter-spacing:.2px;
+}
+.bg {background:var(--green2); color:var(--green); border:1px solid rgba(74,222,128,.25);}
+.br {background:var(--red2);   color:var(--red);   border:1px solid rgba(248,113,113,.25);}
+.bt {background:var(--teal2);  color:var(--teal);  border:1px solid rgba(45,212,191,.25);}
+.ba {background:var(--amber2); color:var(--amber); border:1px solid rgba(251,191,36,.25);}
+.bv {background:var(--violet2);color:var(--violet);border:1px solid rgba(167,139,250,.25);}
 
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-    </style>
+/* CARD BODY */
+.cbody{display:flex;border-bottom:1px solid var(--line);}
+.emp-col{flex:1;padding:9px 14px;}
+.erow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:4px;}
+.ename{font-weight:700;font-size:.84rem;color:var(--t1);}
+.eid{font-family:var(--mono);font-size:.68rem;color:var(--t3);background:var(--bg3);padding:1px 7px;border-radius:4px;}
+.emeta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:3px;}
+.emi{font-size:.71rem;color:var(--t2);display:flex;align-items:center;gap:4px;}
+.emi b{color:var(--t1);}
+.emark{font-size:.71rem;color:var(--amber);font-weight:600;display:flex;align-items:center;gap:4px;margin-bottom:2px;}
+.eaddr{font-size:.69rem;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px;}
+
+/* CARD FOOTER */
+.cfoot{display:flex;flex-direction:column;}
+.fsec{padding:10px 14px;}
+.fsec+.fsec{border-top:1px solid var(--line);}
+.fsec-gps {background:rgba(45,212,191,.02);}
+.fsec-toll{background:rgba(167,139,250,.02);}
+.sec-lbl{
+  font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.9px;
+  display:inline-flex;align-items:center;gap:4px;
+  padding:1px 8px;border-radius:4px;margin-bottom:7px;
+}
+.lbl-gps {background:var(--teal2);  color:var(--teal);  border:1px solid rgba(45,212,191,.2);}
+.lbl-toll{background:var(--violet2);color:var(--violet);border:1px solid rgba(167,139,250,.2);}
+.frow{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;}
+
+/* FORM */
+.fg{display:flex;flex-direction:column;gap:3px;}
+.fg label{font-size:.59rem;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;}
+.inp,.sel{
+  background:var(--bg0);border:1px solid var(--line);color:var(--t1);
+  padding:5px 9px;border-radius:5px;font-size:.76rem;font-family:var(--sans);
+  outline:none;transition:border-color .15s;
+}
+.inp:focus,.sel:focus{border-color:var(--teal);}
+.inp:disabled,.sel:disabled{color:var(--t3);cursor:not-allowed;background:var(--bg2);}
+.inp-time{width:100px;font-family:var(--mono);font-size:.74rem;}
+.inp-rmk{min-width:160px;}
+.sel-loc{min-width:105px;}
+
+/* ACTION BUTTONS */
+.actw{display:flex;gap:5px;align-items:flex-end;}
+.abt{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border:none;border-radius:5px;cursor:pointer;font-size:.76rem;
+  transition:all .15s;
+}
+.abt-sv{background:var(--green2);color:var(--green);border:1px solid rgba(74,222,128,.3);}
+.abt-sv:hover{background:rgba(74,222,128,.2);}
+.abt-ed{background:var(--amber2);color:var(--amber);border:1px solid rgba(251,191,36,.3);}
+.abt-ed:hover{background:rgba(251,191,36,.2);}
+.btn-link{
+  display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 13px;
+  background:var(--violet2);color:var(--violet);border:1px solid rgba(167,139,250,.3);
+  border-radius:5px;cursor:pointer;font-size:.74rem;font-weight:700;font-family:var(--sans);
+  transition:all .15s;
+}
+.btn-link:hover{background:rgba(167,139,250,.18);}
+.hidden{display:none!important;}
+
+/* TOLL ITEMS */
+.toll-list{display:flex;flex-direction:column;gap:4px;margin-bottom:7px;}
+.titem{
+  display:flex;align-items:center;gap:8px;
+  background:var(--bg0);padding:6px 10px;border-radius:5px;
+  border:1px solid var(--line);cursor:pointer;transition:all .12s;
+}
+.titem:hover{border-color:var(--violet);}
+.titem.sel{border-color:var(--violet);background:var(--violet2);}
+.titem input[type=checkbox]{
+  appearance:none;width:13px;height:13px;
+  border:2px solid var(--line2);border-radius:3px;cursor:pointer;flex-shrink:0;
+  position:relative;transition:all .1s;
+}
+.titem input[type=checkbox]:checked{background:var(--violet);border-color:var(--violet);}
+.titem input[type=checkbox]:checked::after{
+  content:'✓';color:#0b0e13;font-size:8px;font-weight:900;
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+}
+.tro{
+  display:flex;align-items:center;gap:8px;
+  background:var(--violet2);padding:6px 10px;border-radius:5px;
+  border:1px solid rgba(167,139,250,.2);
+}
+.tdtl{flex:1;}
+.ttime{font-family:var(--mono);font-size:.7rem;font-weight:600;color:var(--t1);}
+.tdesc{font-size:.69rem;color:var(--t2);margin-top:1px;}
+.tamt{font-family:var(--mono);font-weight:700;font-size:.8rem;padding:2px 8px;border-radius:4px;white-space:nowrap;}
+.tamt-p{color:var(--amber);background:var(--amber2);border:1px solid rgba(251,191,36,.25);}
+.tamt-l{color:var(--violet);background:var(--violet2);border:1px solid rgba(167,139,250,.25);}
+.ttot{
+  display:flex;align-items:center;gap:8px;padding:6px 10px;
+  background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);
+  border-radius:5px;font-size:.72rem;
+}
+.ttot strong{font-family:var(--mono);color:var(--violet);}
+.no-toll{font-size:.7rem;color:var(--t3);padding:5px 2px;font-style:italic;display:flex;align-items:center;gap:6px;}
+
+/* LOADER */
+.ldwrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:70px 20px;gap:10px;}
+.spin{width:34px;height:34px;border:3px solid var(--line2);border-top-color:var(--teal);border-radius:50%;animation:spin .75s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.ldtxt{font-family:var(--mono);font-size:.76rem;color:var(--t3);}
+.ldsub{font-size:.69rem;color:var(--t3);opacity:.6;}
+
+/* TOAST */
+#toast{
+  visibility:hidden;
+  background:var(--bg3);color:var(--t1);
+  border:1px solid var(--line2);
+  padding:10px 20px;border-radius:7px;
+  position:fixed;z-index:9999;left:50%;bottom:32px;transform:translateX(-50%);
+  font-size:.78rem;font-weight:600;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  white-space:nowrap;min-width:200px;text-align:center;
+}
+#toast.on{visibility:visible;animation:tshow .2s,thide .3s 2.7s;}
+@keyframes tshow{from{opacity:0;transform:translateX(-50%) translateY(6px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+@keyframes thide{to{opacity:0;}}
+
+/* EMPTY */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:70px 20px;gap:8px;}
+.empty i{font-size:2.2rem;color:var(--line2);}
+.empty p{font-size:.8rem;color:var(--t3);}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:var(--bg0);}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:2px;}
+</style>
 </head>
-
 <body>
+<div id="sidebar-target"></div>
 
-    <div class="dashboard-container">
+<!-- ── TOPBAR ── -->
+<div class="topbar">
+  <div class="brand"><span class="brand-pulse"></span>GPS CORNER</div>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-stats">
+    <div class="ts"><span class="dot" style="background:var(--t3)"></span>Total&nbsp;<b id="s-total">—</b></div>
+    <div class="ts"><span class="dot" style="background:var(--amber);box-shadow:0 0 6px var(--amber)"></span>Pending&nbsp;<b id="s-pend">—</b></div>
+    <div class="ts"><span class="dot" style="background:var(--green);box-shadow:0 0 6px var(--green)"></span>GPS Done&nbsp;<b id="s-done">—</b></div>
+    <div class="ts"><span class="dot" style="background:var(--violet);box-shadow:0 0 6px var(--violet)"></span>Toll&nbsp;<b id="s-toll">—</b></div>
+  </div>
+  <div class="topbar-actions" style="margin-left:12px;">
+    <button class="btn btn-ghost btn-sm" onclick="toggleFilters()"><i class="fa-solid fa-sliders"></i> Filters</button>
+    <button class="btn btn-teal btn-sm" onclick="doFetch()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+  </div>
+</div>
 
-        <header class="filter-bar">
-            <div class="filter-title">
-                <h2>GPS Corner</h2>
-            </div>
-            <div class="filter-inputs">
-                <input type="date" id="filterDate" class="inp">
-                <input type="text" id="filterCab" placeholder="Search Cab..." class="inp">
-                <input type="text" id="filterDirection" placeholder="Search Direction..." class="inp">
-                <input type="text" id="filtertripid" placeholder="Search Trip ID..." class="inp">
-                <button class="btn-search" onclick="fetchTrips()">
-                    <i class="fa-solid fa-magnifying-glass"></i> Search
-                </button>
-            </div>
-        </header>
+<!-- ── FILTER DRAWER ── -->
+<div class="filter-drawer" id="fdrawer">
+  <input class="fi" type="date" id="fDate" style="min-width:140px;">
+  <input class="fi" type="text" id="fCab"  placeholder="Cab No…">
+  <input class="fi" type="text" id="fDir"  placeholder="Direction…">
+  <input class="fi" type="text" id="fTid"  placeholder="Trip ID…">
+  <button class="btn btn-teal"  onclick="doFetch()"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+  <button class="btn btn-ghost" onclick="clearF()"><i class="fa-solid fa-xmark"></i> Clear</button>
+</div>
 
-        <div class="tabs-header">
-            <button class="tab-btn active" onclick="switchTab('pending')" id="tab-btn-pending">
-                <i class="fa-solid fa-clock"></i> Pending Action
-                <span id="count-pending" class="tab-count">0</span>
-            </button>
-            <button class="tab-btn" onclick="switchTab('completed')" id="tab-btn-completed">
-                <i class="fa-solid fa-check-circle"></i> GPS Updated
-                <span id="count-completed" class="tab-count">0</span>
-            </button>
-        </div>
+<!-- ── TABS ── -->
+<div class="tabs-bar">
+  <button class="tab-btn on" id="tb-pending"   onclick="switchTab('pending')">
+    <i class="fa-solid fa-hourglass-half" style="font-size:.68rem;"></i>Pending
+    <span class="tc" id="tc-pending">0</span>
+  </button>
+  <button class="tab-btn"    id="tb-completed" onclick="switchTab('completed')">
+    <i class="fa-solid fa-circle-check" style="font-size:.68rem;"></i>GPS Updated
+    <span class="tc" id="tc-completed">0</span>
+  </button>
+</div>
 
-        <main id="view-pending" class="cards-wrapper tab-content active">
-        </main>
+<!-- ── VIEWS ── -->
+<div class="pview on" id="pv-pending">
+  <div class="cards-area" id="ca-pending">
+    <div class="ldwrap"><div class="spin"></div><div class="ldtxt">Loading trips…</div><div class="ldsub">Matching toll data</div></div>
+  </div>
+</div>
+<div class="pview" id="pv-completed">
+  <div class="cards-area" id="ca-completed">
+    <div class="ldwrap"><div class="spin"></div><div class="ldtxt">Loading trips…</div></div>
+  </div>
+</div>
 
-        <main id="view-completed" class="cards-wrapper tab-content">
-        </main>
+<div id="toast"></div>
 
+<script>
+/* ─── CONFIG ────────────────────────────────────── */
+const API       = '/api';
+const PG        = 50;   // items per page
+
+/* ─── STATE ─────────────────────────────────────── */
+let ALL = [];            // raw [{trip,tolls}]
+let filtered = [];       // after search
+let page = {pending:1, completed:1};
+
+/* ─── BOOT ──────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', doFetch);
+
+/* ─── FETCH ALL ─────────────────────────────────── */
+async function doFetch() {
+  loading();
+  try {
+    let url = `${API}/gps_trips_with_tolls?`;
+    const d=g('fDate'),c=g('fCab'),dr=g('fDir'),t=g('fTid');
+    if(d)  url+=`date=${d}&`;
+    if(c)  url+=`vehicle=${enc(c)}&`;
+    if(dr) url+=`trip_direction=${enc(dr)}&`;
+    if(t)  url+=`trip_id=${enc(t)}`;
+
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    ALL = await res.json();
+    filtered = [...ALL];
+    page = {pending:1, completed:1};
+    paint();
+  } catch(err) {
+    console.error(err);
+    el('ca-pending').innerHTML =
+      `<div class="ldwrap"><i class="fa-solid fa-triangle-exclamation" style="font-size:1.8rem;color:var(--red);margin-bottom:4px;"></i><div class="ldtxt" style="color:var(--red);">Connection error — check server</div></div>`;
+  }
+}
+
+/* ─── PAINT BOTH GRIDS ──────────────────────────── */
+function paint() {
+  const pend = filtered.filter(d=>!d.trip.journey_start_location);
+  const comp = filtered.filter(d=> d.trip.journey_start_location);
+
+  el('tc-pending').textContent   = pend.length;
+  el('tc-completed').textContent = comp.length;
+  el('s-total').textContent  = ALL.length;
+  el('s-pend').textContent   = ALL.filter(d=>!d.trip.journey_start_location).length;
+  el('s-done').textContent   = ALL.filter(d=> d.trip.journey_start_location).length;
+  el('s-toll').textContent   = ALL.filter(d=>isTollLinked(d.trip)).length;
+
+  paintGrid('pending',   pend);
+  paintGrid('completed', comp);
+}
+
+/* ─── PAINT ONE GRID ────────────────────────────── */
+function paintGrid(key, dataset) {
+  const ca   = el('ca-'+key);
+  const tp   = Math.ceil(dataset.length/PG)||1;
+  page[key]  = Math.min(Math.max(page[key],1), tp);
+  const pg   = page[key];
+  const from = (pg-1)*PG;
+  const slice= dataset.slice(from, from+PG);
+
+  ca.innerHTML = '';
+
+  if(!dataset.length){
+    ca.innerHTML = `<div class="empty"><i class="fa-solid fa-inbox"></i><p>No trips found.</p></div>`;
+    return;
+  }
+
+  ca.appendChild(mkPager(key, dataset.length, pg, tp));
+  slice.forEach((d,i)=>{
+    const c = buildCard(d, key==='completed');
+    c.style.animationDelay = (i*16)+'ms';
+    ca.appendChild(c);
+  });
+  ca.appendChild(mkPager(key, dataset.length, pg, tp));
+}
+
+/* ─── PAGER ─────────────────────────────────────── */
+function mkPager(key, total, cur, tp) {
+  const from = (cur-1)*PG+1;
+  const to   = Math.min(cur*PG, total);
+
+  // page number window ±2
+  let nums = '';
+  for(let p=1;p<=tp;p++){
+    if(p===1||p===tp||Math.abs(p-cur)<=2){
+      nums += `<button class="pgb${p===cur?' cur':''}" onclick="goPage('${key}',${p})">${p}</button>`;
+    } else if(Math.abs(p-cur)===3){
+      nums += `<span class="pg-dots">…</span>`;
+    }
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'pgbar';
+  wrap.innerHTML = `
+    <div class="pg-info">
+      Showing <b>${from}–${to}</b> of <b>${total}</b>
+      &nbsp;·&nbsp;Page <b>${cur}</b> / <b>${tp}</b>
     </div>
+    <div class="pg-btns">
+      <button class="pgb" onclick="goPage('${key}',1)" ${cur===1?'disabled':''}
+        title="First"><i class="fa-solid fa-angles-left"></i></button>
+      <button class="pgb" onclick="goPage('${key}',${cur-1})" ${cur===1?'disabled':''}
+        title="Previous"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+      ${nums}
+      <button class="pgb" onclick="goPage('${key}',${cur+1})" ${cur===tp?'disabled':''}
+        title="Next">Next <i class="fa-solid fa-chevron-right"></i></button>
+      <button class="pgb" onclick="goPage('${key}',${tp})" ${cur===tp?'disabled':''}
+        title="Last"><i class="fa-solid fa-angles-right"></i></button>
+    </div>
+    <div class="pg-jump">
+      Jump to
+      <input type="number" min="1" max="${tp}" placeholder="${cur}"
+        onkeydown="if(event.key==='Enter'){const v=parseInt(this.value)||1;goPage('${key}',v);this.value='';}">
+    </div>`;
+  return wrap;
+}
 
-    <div id="toast">Data Saved Successfully!</div>
+function goPage(key, pg) {
+  const dataset = key==='pending'
+    ? filtered.filter(d=>!d.trip.journey_start_location)
+    : filtered.filter(d=> d.trip.journey_start_location);
+  const tp = Math.ceil(dataset.length/PG)||1;
+  page[key] = Math.min(Math.max(pg,1),tp);
+  paintGrid(key, dataset);
+  el('ca-'+key).scrollIntoView({behavior:'smooth',block:'start'});
+}
 
-    <script>
-        const API_BASE_URL = "/api";
-        let currentTab = 'pending'; // State to remember where we are
+/* ─── BUILD CARD ────────────────────────────────── */
+function buildCard({trip,tolls}, locked) {
+  const uid  = trip.unique_id;
+  const sl   = trip.journey_start_location||'';
+  const el2  = trip.journey_end_location  ||'';
+  const rmk  = trip.gps_remark||'';
+  const pu   = trip.pickup_time||'';
+  const dr   = trip.drop_time  ||'';
+  const tn   = (trip.toll_name||'').trim().replace(/^(none|nan)$/i,'');
+  const lkd  = tn!=='';
+  const dis  = locked?'disabled':'';
 
-        // --- INITIAL LOAD ---
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchTrips();
-        });
+  // GPS buttons
+  const gpsBtns = locked
+    ? `<button id="be-${uid}" class="abt abt-ed" onclick="enableEdit('${uid}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
+       <button id="bs-${uid}" class="abt abt-sv hidden" onclick="saveGps('${uid}')" title="Save"><i class="fa-solid fa-floppy-disk"></i></button>`
+    : `<button class="abt abt-sv" onclick="saveGps('${uid}')" title="Save GPS"><i class="fa-solid fa-floppy-disk"></i></button>`;
 
-        // --- TAB SWITCHER LOGIC ---
-        function switchTab(tabName) {
-            currentTab = tabName;
+  // Toll content
+  let tollHtml = '';
+  if(lkd) {
+    const tot  = (tolls||[]).reduce((s,t)=>s+parseFloat(t.amount||0),0);
+    const rows = (tolls||[]).map(t=>`
+      <div class="tro">
+        <div class="tdtl">
+          <div class="ttime">${t.travel_date_time||''}</div>
+          <div class="tdesc">${t.transaction_description||''}</div>
+        </div>
+        <span class="tamt tamt-l">₹${t.amount}</span>
+      </div>`).join('')||'<div class="no-toll">No toll records found.</div>';
+    tollHtml = `
+      <div class="toll-list">${rows}</div>
+      <div class="ttot">
+        <i class="fa-solid fa-link" style="color:var(--violet);font-size:.65rem;"></i>
+        <span>Linked: <strong style="color:var(--violet);">${tn}</strong></span>
+        <span style="margin-left:auto;font-family:var(--mono);font-weight:700;color:var(--violet);">
+          ₹${tot.toLocaleString('en-IN',{maximumFractionDigits:2})}
+        </span>
+      </div>`;
+  } else if(!tolls||!tolls.length) {
+    tollHtml = `<div class="no-toll"><i class="fa-solid fa-circle-exclamation"></i>No matching tolls within ±1.5h window</div>`;
+  } else {
+    const rows = tolls.map(t=>`
+      <label class="titem" onclick="toggleSel(this)">
+        <input type="checkbox" class="tcb-${uid}" value="${t.id}">
+        <div class="tdtl">
+          <div class="ttime">${t.travel_date_time||''}</div>
+          <div class="tdesc">${t.transaction_description||''}</div>
+        </div>
+        <span class="tamt tamt-p">₹${t.amount}</span>
+      </label>`).join('');
+    tollHtml = `
+      <div class="toll-list">${rows}</div>
+      <button class="btn-link" onclick="saveToll('${uid}')">
+        <i class="fa-solid fa-link"></i>Link Selected
+      </button>`;
+  }
 
-            // 1. Update Buttons
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(`tab-btn-${tabName}`).classList.add('active');
+  let cls = 'card';
+  if(locked) cls+=' gps-on';
+  if(lkd)    cls+=' linked';
 
-            // 2. Show/Hide Content Areas
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.getElementById(`view-${tabName}`).classList.add('active');
-        }
+  const card = document.createElement('div');
+  card.className = cls;
+  card.id = 'card-'+uid;
+  card.innerHTML = `
+  <div class="ch">
+    <div class="chl">
+      <span class="tid">#${trip.trip_id||uid.slice(-6)}</span>
+      <span class="cnum"><i class="fa-solid fa-car-side" style="color:var(--t3);font-size:.65rem;"></i>${trip.cab_reg_no||'—'}</span>
+      <span class="cdate"><i class="fa-regular fa-calendar" style="font-size:.65rem;"></i>${trip.shift_date||''} &nbsp;·&nbsp; ${trip.shift_time||''}</span>
+    </div>
+    <div class="chr">
+      <span class="badge ${trip.route_status==='Pay'?'bg':'br'}">${trip.route_status||'—'}</span>
+      <span class="badge bt">${(trip.trip_direction||'').toUpperCase()}</span>
+      ${locked ?'<span class="badge bg"><i class="fa-solid fa-satellite-dish" style="font-size:.55rem;"></i>GPS</span>':''}
+      ${lkd    ?'<span class="badge bv"><i class="fa-solid fa-receipt" style="font-size:.55rem;"></i>TOLL</span>':''}
+      ${trip.clubbing_status?`<span class="badge ba">${trip.clubbing_status}</span>`:''}
+    </div>
+  </div>
 
-        // --- FETCH & SPLIT DATA ---
-        async function fetchTrips() {
-            const date = document.getElementById('filterDate').value;
-            const cab = document.getElementById('filterCab').value;
-            const direction = document.getElementById('filterDirection').value;
-            const status = document.getElementById('filtertripid').value;
+  <div class="cbody">
+    <div class="emp-col">
+      <div class="erow">
+        <span class="ename">${trip.employee_name||''}</span>
+        <span class="eid">${trip.employee_id||''}</span>
+        ${trip.gender?`<span style="font-size:.69rem;color:var(--t3);">${trip.gender}</span>`:''}
+      </div>
+      <div class="emeta">
+        <div class="emi"><i class="fa-regular fa-building" style="font-size:.6rem;"></i><b>${trip.office||'—'}</b></div>
+        ${trip.cab_type?`<div class="emi"><i class="fa-solid fa-car" style="font-size:.6rem;"></i><b>${trip.cab_type}</b></div>`:''}
+      </div>
+      <div class="emark"><i class="fa-solid fa-location-dot" style="font-size:.6rem;"></i>${trip.landmark||'No Landmark'}</div>
+      <div class="eaddr">${trip.address||''}</div>
+    </div>
+  </div>
 
-            const pendingContainer = document.getElementById('view-pending');
-            const completedContainer = document.getElementById('view-completed');
+  <div class="cfoot">
+    <!-- GPS -->
+    <div class="fsec fsec-gps">
+      <span class="sec-lbl lbl-gps"><i class="fa-solid fa-satellite-dish"></i>GPS Data</span>
+      <div class="frow">
+        <div class="fg">
+          <label>Start</label>
+          <select id="s0-${uid}" class="sel sel-loc" ${dis}>
+            <option value="">—</option>
+            <option value="Parking"  ${sl==='Parking' ?'selected':''}>Parking</option>
+            <option value="Terminal" ${sl==='Terminal'?'selected':''}>Terminal</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Pickup Time</label>
+          <input type="time" id="s1-${uid}" class="inp inp-time" value="${toTime(pu)}" ${dis}>
+        </div>
+        <div class="fg">
+          <label>Drop Time</label>
+          <input type="time" id="s2-${uid}" class="inp inp-time" value="${toTime(dr)}" ${dis}>
+        </div>
+        <div class="fg">
+          <label>End</label>
+          <select id="s3-${uid}" class="sel sel-loc" ${dis}>
+            <option value="">—</option>
+            <option value="Parking"  ${el2==='Parking' ?'selected':''}>Parking</option>
+            <option value="Terminal" ${el2==='Terminal'?'selected':''}>Terminal</option>
+            <option value="Cab Move" ${el2==='Cab Move'?'selected':''}>Cab Move</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Remark</label>
+          <input type="text" id="s4-${uid}" class="inp inp-rmk" value="${rmk}" placeholder="Optional…" ${dis}>
+        </div>
+        <div class="actw">${gpsBtns}</div>
+      </div>
+    </div>
+    <!-- TOLL -->
+    <div class="fsec fsec-toll">
+      <span class="sec-lbl lbl-toll"><i class="fa-solid fa-receipt"></i>Toll Data <span style="font-weight:400;opacity:.5;font-size:.54rem;">&nbsp;±1.5h match</span></span>
+      ${tollHtml}
+    </div>
+  </div>`;
+  return card;
+}
 
-            // Loading State
-            pendingContainer.innerHTML = '<p style="color:#666;">Loading...</p>';
+/* ─── UI HELPERS ────────────────────────────────── */
+function isTollLinked(t){
+  const n=(t.toll_name||'').trim().toLowerCase();
+  return n!==''&&n!=='none'&&n!=='nan';
+}
+function toTime(v){
+  if(!v) return '';
+  const m=v.match(/(\d{1,2}):(\d{2})/);
+  return m?m[1].padStart(2,'0')+':'+m[2]:'';
+}
+function g(id){return document.getElementById(id).value;}
+function el(id){return document.getElementById(id);}
+function enc(s){return encodeURIComponent(s);}
+function toggleSel(lbl){
+  const cb=lbl.querySelector('input[type=checkbox]');
+  if(cb) setTimeout(()=>cb.checked?lbl.classList.add('sel'):lbl.classList.remove('sel'),0);
+}
+function loading(){
+  el('ca-pending').innerHTML  =`<div class="ldwrap"><div class="spin"></div><div class="ldtxt">Loading trips…</div><div class="ldsub">Fetching GPS & toll data</div></div>`;
+  el('ca-completed').innerHTML=`<div class="ldwrap"><div class="spin"></div><div class="ldtxt">Loading trips…</div></div>`;
+}
 
-            try {
-                // Build URL with Parameters
-                let url = `${API_BASE_URL}/gps_trips?`;
-                if (date) url += `date=${date}&`;
-                if (cab) url += `vehicle=${cab}&`;
-                if (direction) url += `trip_direction=${direction}&`;
-                if (status) url += `trip_id=${status}`;
+/* ─── TABS ──────────────────────────────────────── */
+function switchTab(key){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.pview').forEach(p=>p.classList.remove('on'));
+  el('tb-'+key).classList.add('on');
+  el('pv-'+key).classList.add('on');
+}
 
-                const response = await fetch(url);
-                if (!response.ok) throw new Error("Network response was not ok");
+function toggleFilters(){
+  el('fdrawer').classList.toggle('open');
+}
+function clearF(){
+  ['fDate','fCab','fDir','fTid'].forEach(id=>el(id).value='');
+  doFetch();
+}
 
-                const trips = await response.json();
+/* ─── ENABLE EDIT ───────────────────────────────── */
+function enableEdit(uid){
+  ['s0-','s1-','s2-','s3-','s4-'].forEach(p=>{
+    const e=el(p+uid);if(e)e.disabled=false;
+  });
+  el('be-'+uid).classList.add('hidden');
+  el('bs-'+uid).classList.remove('hidden');
+}
 
-                // --- SPLIT LOGIC ---
-                // If 'journey_start_location' is empty -> PENDING
-                // If 'journey_start_location' has text -> COMPLETED
-                const pendingTrips = trips.filter(t => !t.journey_start_location);
-                const completedTrips = trips.filter(t => t.journey_start_location);
+/* ─── SAVE GPS ──────────────────────────────────── */
+async function saveGps(uid){
+  const body={
+    journey_start: el('s0-'+uid).value,
+    pickup_time:   el('s1-'+uid).value,
+    drop_time:     el('s2-'+uid).value,
+    journey_end:   el('s3-'+uid).value,
+    gps_remark:    el('s4-'+uid).value,
+  };
+  try{
+    const r=await fetch(`${API}/update_gps/${uid}`,{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
+    });
+    r.ok?toast('GPS Saved ✓','green'):toast('Error saving GPS','red');
+    if(r.ok) doFetch();
+  }catch{toast('Connection error','red');}
+}
 
-                // Update Counts on Tabs
-                document.getElementById('count-pending').innerText = pendingTrips.length;
-                document.getElementById('count-completed').innerText = completedTrips.length;
+/* ─── SAVE TOLL ─────────────────────────────────── */
+async function saveToll(uid){
+  const ids=[...document.querySelectorAll(`.tcb-${uid}:checked`)].map(c=>c.value);
+  if(!ids.length){toast('Select at least one toll','amber');return;}
+  try{
+    const r=await fetch(`${API}/toll/mark`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({trip_unique_id:uid,selected_toll_ids:ids})
+    });
+    r.ok?toast('Toll Linked ✓','violet'):toast('Error linking toll','red');
+    if(r.ok) doFetch();
+  }catch{toast('Connection error','red');}
+}
 
-                // Render Lists
-                // false = Not Locked (Green Button)
-                renderList(pendingTrips, pendingContainer, false);
-                // true = Locked (Orange Button)
-                renderList(completedTrips, completedContainer, true);
-
-            } catch (error) {
-                console.error("Error:", error);
-                pendingContainer.innerHTML = `<p style="color:red;">Error connecting to server.</p>`;
-            }
-        }
-
-        // --- RENDER CARDS ---
-        function renderList(trips, container, isLocked) {
-            container.innerHTML = '';
-
-            if (trips.length === 0) {
-                container.innerHTML = '<p style="grid-column: 1/-1; padding: 20px; color:#888;">No trips found in this section.</p>';
-                return;
-            }
-
-            trips.forEach(trip => {
-                const card = document.createElement('div');
-                card.className = 'trip-card';
-
-                const uid = trip.unique_id;
-                const startLoc = trip.journey_start_location || '';
-                const gpstime = trip.gps_time || '';
-                const endLoc = trip.journey_end_location || '';
-                const remark = trip.gps_remark || '';
-
-                // If locked, disable inputs
-                const disabledAttr = isLocked ? 'disabled' : '';
-
-                // Button Logic
-                let buttonsHtml = '';
-                if (isLocked) {
-                    // COMPLETED TAB: Show Edit (Orange)
-                    buttonsHtml = `
-                        <button id="btn-edit-${uid}" class="btn-edit" onclick="enableEdit('${uid}')" title="Edit">
-                            <i class="fa-solid fa-pen"></i>
-                        </button>
-                        <button id="btn-save-${uid}" class="btn-save hidden" onclick="saveTrip('${uid}')" title="Save">
-                            <i class="fa-solid fa-floppy-disk"></i>
-                        </button>
-                    `;
-                } else {
-                    // PENDING TAB: Show Save (Green)
-                    buttonsHtml = `
-                        <button class="btn-save" onclick="saveTrip('${uid}')" title="Save">
-                            <i class="fa-solid fa-floppy-disk"></i>
-                        </button>
-                    `;
-                }
-
-                card.innerHTML = `
-                    <div class="card-header">
-                        <div class="header-left">
-                            <span class="trip-id">ID: ${trip.trip_id || ''}</span>
-                            <span class="trip-date"><i class="fa-regular fa-calendar"></i> ${trip.trip_date || ''}</span>
-                            <span class="cab_reg_no"><i class="fa-solid fa-car"></i> ${trip.cab_reg_no || ''}</span>
-                        </div>
-                        <div class="header-right">
-                             <span class="badge ${trip.route_status === 'Pay' ? 'badge-green' : 'badge-red'}">ROUTE: ${trip.route_status || ''}</span>
-                             <span class="badge badge-blue"> ${trip.trip_direction || ''}</span>   
-                        </div>
-                    </div>
-
-                    <div class="card-body">
-                        <div class="emp-table-wrapper">
-                            <table class="emp-table">
-                                <thead>
-                                    <tr>
-                                        <th>EMP ID</th>
-                                        <th>NAME</th>
-                                        <th>ADDRESS</th>
-                                        <th>Reporting Location</th>
-                                        <th>STATUS</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>${trip.employee_id}</td>
-                                        <td><strong>${trip.employee_name}</strong></td>
-                                        <td class="addr-cell">${trip.address}</td>
-                                        <td class="addr-cell">${trip.office}</td>
-                                        <td><span class="badge badge-red-light">${trip.clubbing_status}</span></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div class="card-footer-yellow">
-                        <div class="form-group">
-                            <label>START</label>
-                            <select id="start-${uid}" class="form-input" ${disabledAttr}>
-                                <option value="">--</option>
-                                <option value="Parking" ${startLoc === 'Parking' ? 'selected' : ''}>Parking</option>
-                                <option value="Terminal" ${startLoc === 'Terminal' ? 'selected' : ''}>Terminal</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>GPS TIME</label>
-                            <input type="text" id="gps_time-${uid}" class="form-input" 
-                                   value="${gpstime}" placeholder="--:-- To --:--" ${disabledAttr} /> 
-                        </div>
-                        <div class="form-group">
-                            <label>END</label>
-                            <select id="end-${uid}" class="form-input" ${disabledAttr}>
-                                <option value="">--</option>
-                                <option value="Parking" ${endLoc === 'Parking' ? 'selected' : ''}>Parking</option>
-                                <option value="Terminal" ${endLoc === 'Terminal' ? 'selected' : ''}>Terminal</option>
-                                <option value="Cab Move" ${endLoc === 'Cab Move' ? 'selected' : ''}>Cab Move</option>
-                            </select>
-                        </div>
-                        <div class="form-group wide">
-                            <label>REMARK</label>
-                            <input type="text" id="remark-${uid}" class="form-input" 
-                                   placeholder="..." value="${remark}" ${disabledAttr}>
-                        </div>
-                        ${buttonsHtml}
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        // --- EDIT MODE ---
-        function enableEdit(uid) {
-            document.getElementById(`start-${uid}`).disabled = false;
-            document.getElementById(`gps_time-${uid}`).disabled = false;
-            document.getElementById(`end-${uid}`).disabled = false;
-            document.getElementById(`remark-${uid}`).disabled = false;
-
-            document.getElementById(`btn-edit-${uid}`).classList.add('hidden');
-            document.getElementById(`btn-save-${uid}`).classList.remove('hidden');
-        }
-
-        // --- SAVE DATA ---
-        async function saveTrip(uniqueId) {
-            const start = document.getElementById(`start-${uniqueId}`).value;
-            const gps_time = document.getElementById(`gps_time-${uniqueId}`).value;
-            const end = document.getElementById(`end-${uniqueId}`).value;
-            const remark = document.getElementById(`remark-${uniqueId}`).value;
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/update_gps/${uniqueId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        journey_start: start,
-                        journey_end: end,
-                        gps_remark: remark,
-                        gps_time: gps_time
-                    })
-                });
-
-                if (response.ok) {
-                    showToast("Saved!");
-                    fetchTrips(); // Reloads data -> moves card to 'Completed' tab
-                } else {
-                    showToast("Error saving.");
-                }
-            } catch (error) {
-                console.error("Save Error:", error);
-                showToast("Connection Error");
-            }
-        }
-
-        function showToast(message) {
-            const x = document.getElementById("toast");
-            x.innerText = message;
-            x.className = "show";
-            setTimeout(() => { x.className = x.className.replace("show", ""); }, 3000);
-        }
-
-        // --- GPS TIME MASKING (With Cursor Fix) ---
-        document.addEventListener("input", function (e) {
-            const input = e.target;
-            if (!input.id.startsWith("gps_time-")) return;
-
-            let oldVal = input.value;
-            let oldCursor = input.selectionEnd;
-            let digits = input.value.replace(/\D/g, "").slice(0, 8);
-
-            // Build mask
-            let temp = digits.padEnd(8, "_");
-            let p1 = temp.slice(0, 2).replace(/_/g, "-");
-            let p2 = temp.slice(2, 4).replace(/_/g, "-");
-            let p3 = temp.slice(4, 6).replace(/_/g, "-");
-            let p4 = temp.slice(6, 8).replace(/_/g, "-");
-            let newVal = `${p1}:${p2} To ${p3}:${p4}`;
-
-            input.value = newVal;
-
-            // Handle delete action
-            if (e.inputType && e.inputType.startsWith("delete")) {
-                input.setSelectionRange(oldCursor, oldCursor);
-                return;
-            }
-
-            // Move cursor to end of typed digits
-            let lastDigitIndex = -1;
-            for (let i = 0; i < newVal.length; i++) {
-                if (/\d/.test(newVal[i])) lastDigitIndex = i;
-            }
-
-            let newCursor = lastDigitIndex + 1;
-            while (newCursor < newVal.length && /[^0-9\-]/.test(newVal[newCursor])) {
-                newCursor++;
-            }
-            input.setSelectionRange(newCursor, newCursor);
-        });
-
-    </script>
-
+/* ─── TOAST ─────────────────────────────────────── */
+function toast(msg, color='teal'){
+  const map={teal:'var(--teal)',green:'var(--green)',amber:'var(--amber)',red:'var(--red)',violet:'var(--violet)'};
+  const t=el('toast');
+  t.textContent=msg;
+  t.style.borderColor=map[color]||map.teal;
+  t.style.color=map[color]||map.teal;
+  t.className='on';
+  setTimeout(()=>t.className=t.className.replace('on',''),3000);
+}
+</script>
 </body>
-
 </html>

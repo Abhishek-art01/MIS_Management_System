@@ -2,10 +2,10 @@ import os
 import io
 import pandas as pd
 from pathlib import Path
-from fastapi import APIRouter, Depends, Request, File, UploadFile, Response
 from fastapi.responses import RedirectResponse, FileResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select, Session, text
+from fastapi import APIRouter, Depends, Request, File, UploadFile, Response, Form
 
 # Internal Imports
 from database import get_session
@@ -97,6 +97,64 @@ async def upload_operation_data(file: UploadFile = File(...), session: Session =
         session.commit()
 
         return JSONResponse(content={"status": "success", "message": f"Successfully uploaded {len(db_records)} new rows."})
+    except Exception as e:
+        session.rollback()
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+    
+@router.get("/api/tables")
+async def get_available_tables(session: Session = Depends(get_session)):
+    try:
+        from sqlalchemy import inspect
+        
+        # Get engine from the active session
+        inspector = inspect(session.bind)
+        all_tables = inspector.get_table_names()
+        
+        # Exclude user-related tables
+        excluded = {"user", "users", "user_roles", "user_sessions", "alembic_version"}
+        filtered = [t for t in all_tables if t.lower() not in excluded]
+        
+        return {"tables": filtered}
+    
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+    
+@router.post("/api/upload")
+async def upload_data(
+    file: UploadFile = File(...),
+    table: str = Form(...),
+    mode: str = Form(...),          # "append" or "erase"
+    session: Session = Depends(get_session)
+):
+    try:
+        contents = await file.read()
+        df = pd.read_excel(io.BytesIO(contents))
+        df = df.where(pd.notnull(df), None)
+        records = df.to_dict(orient="records")
+
+        if not records:
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Uploaded file is empty."})
+
+        if mode == "erase":
+            # Delete all existing rows in the target table
+            session.exec(text(f"DELETE FROM {table}"))
+            session.commit()
+
+        if mode == "append":
+            # Fetch existing rows as a set of tuples for deduplication
+            existing_rows = session.exec(text(f"SELECT * FROM {table}")).all()
+            existing_set  = set(existing_rows)
+            records = [r for r in records if tuple(r.values()) not in existing_set]
+
+            if not records:
+                return JSONResponse(content={"status": "success", "message": "No new unique rows to insert."})
+
+        # Raw insert into any table without needing a model
+        session.exec(text(f"INSERT INTO {table} ({', '.join(records[0].keys())}) VALUES ({', '.join([':' + k for k in records[0].keys()])})"), records)
+        session.commit()
+
+        return JSONResponse(content={"status": "success", "message": f"Successfully inserted {len(records)} rows into '{table}'."})
+
     except Exception as e:
         session.rollback()
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})

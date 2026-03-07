@@ -5,166 +5,1055 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Toll Audit Manager</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="/components-static/Sidebar.css">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
-        .header { background: white; padding: 15px 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;}
-        .header h2 { margin: 0; font-size: 1.2rem; color: #1e88e5; }
-        
-        .grid-container { display: flex; flex-direction: column; gap: 15px; }
-        
-        .mapping-card { display: flex; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e0e0e0; }
-        
-        /* Left Side: Trip Details */
-        .trip-info { flex: 1; padding: 15px; background: #fffcf5; border-right: 2px dashed #e0e0e0; display: flex; flex-direction: column; gap: 6px; }
-        .trip-info h4 { margin: 0 0 10px 0; color: #d84315; font-size: 1rem; border-bottom: 1px solid #ffe082; padding-bottom: 5px; }
-        .trip-detail { font-size: 0.85rem; color: #555; }
-        .trip-detail strong { color: #000; }
-        .address-box { background: #fff; padding: 8px; border: 1px solid #f1e2b3; border-radius: 4px; font-size: 0.8rem; margin-top: 5px;}
-
-        /* Right Side: Toll Checkboxes */
-        .toll-options { flex: 1.2; padding: 15px; display: flex; flex-direction: column; gap: 10px; background: #f8fafc;}
-        .toll-options h4 { margin: 0 0 5px 0; color: #1565c0; font-size: 1rem; }
-        
-        .toll-item { 
-            display: flex; align-items: center; gap: 12px; 
-            background: white; padding: 10px 12px; border-radius: 6px; 
-            border: 1px solid #cbd5e1; cursor: pointer; transition: 0.2s;
+        :root {
+            --bg:         #0a0e14;
+            --surface:    #111720;
+            --surface2:   #161d2a;
+            --surface3:   #1c2638;
+            --border:     #252f42;
+            --border2:    #2e3d57;
+            --accent:     #4d9fff;
+            --accent2:    #ff6b6b;
+            --green:      #3ddc84;
+            --yellow:     #ffc947;
+            --purple:     #b08aff;
+            --text:       #dce8f5;
+            --text-muted: #6b809c;
+            --text-dim:   #4a5f7a;
+            --card-radius:12px;
+            --font-main:  'DM Sans', sans-serif;
+            --font-mono:  'IBM Plex Mono', monospace;
         }
-        .toll-item:hover { border-color: #3b82f6; background: #eff6ff; }
-        .toll-item input { transform: scale(1.3); cursor: pointer; }
-        
-        .toll-details { flex: 1; font-size: 0.85rem; line-height: 1.4; }
-        .toll-amount { font-weight: bold; color: #b91c1c; font-size: 1rem; background: #fee2e2; padding: 4px 8px; border-radius: 4px;}
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--font-main); background: var(--bg); color: var(--text); min-height: 100vh; }
 
-        .btn-save { background: #059669; color: white; border: none; padding: 10px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-top: 10px; font-size: 0.9rem;}
-        .btn-save:hover { background: #047857; }
-        .btn-refresh { background: #2563eb; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;}
-        
-        .loader { text-align: center; padding: 30px; color: #666; font-size: 1.1rem; }
+        /* ─── TOPBAR ─── */
+        .topbar {
+            position: sticky; top: 0; z-index: 200;
+            background: rgba(10,14,20,0.97); backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px; display: flex; justify-content: space-between; align-items: stretch; height: 54px;
+        }
+        .topbar-left  { display: flex; align-items: center; gap: 14px; }
+        .topbar-right { display: flex; align-items: center; gap: 8px; }
+        .topbar-brand {
+            font-family: var(--font-mono); font-size: 0.88rem; font-weight: 600;
+            color: var(--accent); letter-spacing: 1px; text-transform: uppercase;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .topbar-brand::before {
+            content: ''; display: inline-block; width: 8px; height: 8px;
+            background: var(--accent); border-radius: 50%; box-shadow: 0 0 8px var(--accent);
+        }
+        .tabs { display: flex; align-items: stretch; gap: 2px; margin-left: 4px; }
+        .tab-btn {
+            display: flex; align-items: center; gap: 7px; padding: 0 18px;
+            background: none; border: none; border-bottom: 2px solid transparent;
+            color: var(--text-muted); font-family: var(--font-main); font-size: 0.82rem;
+            font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+        }
+        .tab-btn:hover { color: var(--text); }
+        .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+        .tab-count { font-family: var(--font-mono); font-size: 0.67rem; font-weight: 700; padding: 2px 7px; border-radius: 20px; line-height: 1.4; }
+        .tab-btn.active .tab-count { background: rgba(77,159,255,0.15); border: 1px solid rgba(77,159,255,0.35); color: var(--accent); }
+        .tab-btn:not(.active) .tab-count { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); }
+
+        .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: none; border-radius: 7px; cursor: pointer; font-family: var(--font-main); font-size: 0.8rem; font-weight: 600; transition: all 0.15s; white-space: nowrap; }
+        .btn-primary { background: var(--accent); color: #0a0e14; }
+        .btn-primary:hover { background: #6ab3ff; transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+        .btn-green { background: var(--green); color: #0a0e14; }
+        .btn-green:hover { background: #5aeba0; transform: translateY(-1px); }
+        .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+        .btn-ghost:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+
+        /* ─── FILTER PANEL ─── */
+        .filter-panel {
+            background: var(--surface); border-bottom: 1px solid var(--border);
+            padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label {
+            font-size: 0.67rem; font-weight: 700; color: var(--text-dim);
+            text-transform: uppercase; letter-spacing: 0.8px; font-family: var(--font-mono);
+            display: flex; align-items: center; gap: 5px;
+        }
+
+        /* ─── MULTI-SELECT ─── */
+        .ms-wrap { position: relative; }
+        .ms-trigger {
+            background: var(--bg); border: 1px solid var(--border); color: var(--text);
+            padding: 7px 10px; border-radius: 7px; font-size: 0.8rem; font-family: var(--font-main);
+            cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+            gap: 6px; min-width: 160px; user-select: none; transition: border-color 0.15s;
+        }
+        .ms-trigger:hover, .ms-trigger.open { border-color: var(--accent); }
+        .ms-trigger.required-empty { border-color: rgba(255,201,71,0.6); }
+        .ms-trigger-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; color: var(--text-muted); font-size: 0.8rem; }
+        .ms-trigger-text.has-selection { color: var(--accent); font-weight: 600; }
+        .ms-trigger-text.required-hint { color: var(--yellow); }
+        .ms-trigger-chevron { font-size: 0.6rem; color: var(--text-dim); flex-shrink: 0; transition: transform 0.15s; }
+        .ms-trigger.open .ms-trigger-chevron { transform: rotate(180deg); }
+        .ms-dropdown {
+            display: none; position: absolute; top: calc(100% + 4px); left: 0;
+            min-width: 240px; max-width: 360px; background: var(--surface2);
+            border: 1px solid var(--accent); border-radius: 8px; z-index: 1000;
+            box-shadow: 0 8px 28px rgba(0,0,0,0.6); overflow: hidden;
+        }
+        .ms-dropdown.open { display: block; }
+        .ms-search { width: 100%; background: var(--bg); border: none; border-bottom: 1px solid var(--border); color: var(--text); padding: 8px 12px; font-size: 0.78rem; font-family: var(--font-main); outline: none; }
+        .ms-search::placeholder { color: var(--text-muted); }
+        .ms-list { max-height: 220px; overflow-y: auto; padding: 4px 0; }
+        .ms-option { display: flex; align-items: center; gap: 8px; padding: 7px 12px; cursor: pointer; font-size: 0.79rem; transition: background 0.1s; user-select: none; }
+        .ms-option:hover { background: rgba(77,159,255,0.08); }
+        .ms-option input[type="checkbox"] { appearance: none; width: 14px; height: 14px; border: 2px solid var(--border2); border-radius: 3px; cursor: pointer; flex-shrink: 0; position: relative; transition: all 0.1s; }
+        .ms-option input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+        .ms-option input[type="checkbox"]:checked::after { content: '✓'; color: #0a0e14; font-size: 9px; font-weight: 900; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+        .ms-no-results { padding: 10px 12px; font-size: 0.76rem; color: var(--text-muted); }
+        .ms-footer { display: flex; justify-content: space-between; padding: 6px 10px; border-top: 1px solid var(--border); gap: 6px; }
+        .ms-footer button { flex: 1; background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; cursor: pointer; font-family: var(--font-main); transition: all 0.15s; }
+        .ms-footer button:hover { background: var(--surface3); color: var(--text); }
+        .ms-footer .ms-btn-all { border-color: rgba(77,159,255,0.35); color: var(--accent); }
+
+        /* ─── TIME GAP SLIDER ─── */
+        .gap-group { display: flex; flex-direction: column; gap: 5px; }
+        .gap-group label { font-size: 0.67rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; font-family: var(--font-mono); display: flex; align-items: center; gap: 5px; }
+        .gap-control {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+            padding: 7px 12px; display: flex; align-items: center; gap: 10px; min-width: 220px;
+        }
+        .gap-value {
+            font-family: var(--font-mono); font-size: 0.82rem; font-weight: 700;
+            color: var(--accent); min-width: 52px; text-align: center;
+            background: rgba(77,159,255,0.1); border: 1px solid rgba(77,159,255,0.25);
+            border-radius: 5px; padding: 2px 6px;
+        }
+        input[type="range"].gap-slider {
+            flex: 1; appearance: none; height: 4px; background: var(--border2);
+            border-radius: 2px; outline: none; cursor: pointer;
+        }
+        input[type="range"].gap-slider::-webkit-slider-thumb {
+            appearance: none; width: 16px; height: 16px; border-radius: 50%;
+            background: var(--accent); cursor: pointer; box-shadow: 0 0 6px rgba(77,159,255,0.5);
+            transition: transform 0.1s;
+        }
+        input[type="range"].gap-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        /* ─── FILTER ACTIONS ─── */
+        .filter-actions { display: flex; gap: 8px; align-items: flex-end; margin-left: auto; }
+        .filter-divider { width: 1px; height: 36px; background: var(--border); align-self: flex-end; }
+
+        /* ─── ACTIVE CHIPS ─── */
+        .active-filters { padding: 7px 24px; display: flex; gap: 8px; flex-wrap: wrap; background: var(--bg); border-bottom: 1px solid var(--border); align-items: center; }
+        .filter-chip { display: inline-flex; align-items: center; gap: 5px; background: rgba(77,159,255,0.08); border: 1px solid rgba(77,159,255,0.25); color: var(--accent); padding: 3px 9px; border-radius: 20px; font-size: 0.71rem; font-family: var(--font-mono); }
+        .filter-chip.chip-date { background: rgba(255,201,71,0.1); border-color: rgba(255,201,71,0.35); color: var(--yellow); }
+        .filter-chip.chip-gap  { background: rgba(176,138,255,0.1); border-color: rgba(176,138,255,0.3); color: var(--purple); }
+        .filter-chip button { background: none; border: none; color: inherit; cursor: pointer; font-size: 0.82rem; line-height: 1; padding: 0 2px; opacity: 0.7; }
+        .filter-chip button:hover { opacity: 1; }
+
+        /* ─── STATS BAR ─── */
+        .stats-bar { display: flex; gap: 16px; align-items: center; padding: 9px 24px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+        .stat-item { display: flex; align-items: center; gap: 6px; font-size: 0.77rem; color: var(--text-muted); }
+        .stat-item strong { color: var(--text); font-family: var(--font-mono); }
+        .stat-divider { width: 1px; height: 14px; background: var(--border); }
+
+        /* ─── PAGES ─── */
+        .page { display: none; }
+        .page.active { display: block; }
+        .main-content { padding: 18px 24px; display: flex; flex-direction: column; gap: 12px; }
+
+        /* ─── LANDING (before date selected) ─── */
+        .date-landing {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 58vh; gap: 14px; text-align: center; padding: 40px 24px;
+        }
+        .date-landing-icon { font-size: 3.5rem; color: var(--border2); margin-bottom: 6px; }
+        .date-landing h2 { font-size: 1.1rem; color: var(--text); font-weight: 600; }
+        .date-landing p { font-size: 0.82rem; color: var(--text-muted); max-width: 340px; line-height: 1.7; }
+        .landing-steps { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+        .landing-step {
+            display: flex; align-items: center; gap: 10px; background: var(--surface);
+            border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px;
+            font-size: 0.8rem; color: var(--text-muted);
+        }
+        .landing-step-num {
+            width: 22px; height: 22px; border-radius: 50%; background: rgba(77,159,255,0.15);
+            border: 1px solid rgba(77,159,255,0.3); color: var(--accent);
+            font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+
+        /* ─── LOADER / EMPTY ─── */
+        .loader { text-align: center; padding: 60px 20px; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .loader i { font-size: 2rem; color: var(--accent); }
+        .empty-state { text-align: center; padding: 80px 20px; color: var(--text-muted); }
+        .empty-state i { font-size: 2.5rem; margin-bottom: 14px; display: block; }
+        .empty-state h3 { font-size: 1rem; color: var(--text); margin-bottom: 6px; }
+
+        /* ─── CARDS ─── */
+        .mapping-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--card-radius); overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s; }
+        .mapping-card:hover { border-color: var(--border2); box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
+        .mapping-card.is-updated { border-color: rgba(61,220,132,0.2); }
+        .mapping-card.is-updated:hover { border-color: rgba(61,220,132,0.45); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; padding: 9px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 6px; }
+        .card-header-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .cab-reg { font-family: var(--font-mono); font-weight: 600; font-size: 0.85rem; color: var(--text); background: var(--bg); padding: 3px 10px; border-radius: 5px; border: 1px solid var(--border2); display: flex; align-items: center; gap: 5px; }
+        .direction-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; font-family: var(--font-mono); }
+        .direction-pickup { background: rgba(61,220,132,0.12);  border: 1px solid rgba(61,220,132,0.35);  color: #3ddc84; }
+        .direction-drop   { background: rgba(255,107,107,0.12); border: 1px solid rgba(255,107,107,0.35); color: #ff6b6b; }
+        .direction-in     { background: rgba(77,159,255,0.12);  border: 1px solid rgba(77,159,255,0.35);  color: #4d9fff; }
+        .direction-out    { background: rgba(255,201,71,0.12);  border: 1px solid rgba(255,201,71,0.35);  color: #ffc947; }
+        .updated-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; font-family: var(--font-mono); background: rgba(61,220,132,0.12); border: 1px solid rgba(61,220,132,0.35); color: var(--green); }
+        .pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 0.68rem; font-weight: 600; font-family: var(--font-mono); }
+        .pill-blue   { background: rgba(77,159,255,0.1);  border: 1px solid rgba(77,159,255,0.22);  color: var(--accent); }
+        .pill-yellow { background: rgba(255,201,71,0.1);  border: 1px solid rgba(255,201,71,0.22);  color: var(--yellow); }
+
+        .card-body { display: flex; flex-wrap: wrap; }
+        .trip-info { flex: 1; min-width: 280px; padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; border-right: 1px dashed var(--border); }
+        .meta-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--surface3); border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; }
+        .meta-sep { width: 1px; height: 14px; background: var(--border2); flex-shrink: 0; }
+        .meta-item { display: flex; align-items: center; gap: 5px; font-size: 0.76rem; color: var(--text-muted); }
+        .meta-item strong { color: var(--text); font-weight: 600; }
+        .emp-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; flex-wrap: wrap; }
+        .emp-name { font-weight: 600; color: var(--text); }
+        .emp-id { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); background: var(--surface3); padding: 1px 7px; border-radius: 4px; }
+        .emp-gender { font-size: 0.7rem; color: var(--text-dim); background: var(--surface3); padding: 1px 7px; border-radius: 4px; }
+        .times-block { background: var(--surface3); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+        .times-block-header { font-size: 0.65rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; font-family: var(--font-mono); display: flex; align-items: center; justify-content: space-between; }
+        .times-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .time-block { display: flex; align-items: center; gap: 6px; }
+        .time-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .time-dot.pickup { background: #3ddc84; box-shadow: 0 0 6px #3ddc84; }
+        .time-dot.drop   { background: #ff6b6b; box-shadow: 0 0 6px #ff6b6b; }
+        .time-label { font-size: 0.68rem; color: var(--text-muted); font-weight: 600; }
+        .time-value { font-family: var(--font-mono); font-size: 0.82rem; font-weight: 600; color: var(--text); }
+        .times-arrow { color: var(--border2); font-size: 0.65rem; }
+        .time-edit-row { display: none; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 4px; padding: 6px 8px; background: rgba(77,159,255,0.05); border: 1px dashed rgba(77,159,255,0.25); border-radius: 6px; }
+        .time-edit-row.visible { display: flex; }
+        .time-edit-label { font-size: 0.68rem; color: var(--accent); font-weight: 700; font-family: var(--font-mono); min-width: 50px; }
+        .time-edit-input { font-family: var(--font-mono); font-size: 0.78rem; background: var(--bg); border: 1px solid var(--accent); color: var(--text); padding: 4px 8px; border-radius: 5px; outline: none; width: 100px; }
+        .time-edit-input.err { border-color: var(--accent2); }
+        .btn-micro { padding: 3px 8px; font-size: 0.68rem; border-radius: 4px; border: none; cursor: pointer; font-family: var(--font-mono); font-weight: 600; }
+        .btn-micro-edit   { background: rgba(77,159,255,0.15); color: var(--accent); }
+        .btn-micro-save   { background: rgba(61,220,132,0.15); color: var(--green); }
+        .btn-micro-cancel { background: rgba(255,107,107,0.12); color: var(--accent2); }
+        .address-block { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+        .address-landmark { font-size: 0.78rem; font-weight: 600; color: var(--accent2); margin-bottom: 3px; }
+        .address-text { font-size: 0.73rem; color: var(--text-muted); line-height: 1.4; }
+        .journey-row { display: flex; gap: 6px; align-items: center; font-size: 0.74rem; flex-wrap: wrap; }
+
+        /* ─── TOLL COLUMN ─── */
+        .toll-options { flex: 1.4; min-width: 280px; padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; }
+        .tolls-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+        .tolls-title { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-family: var(--font-mono); display: flex; align-items: center; gap: 6px; }
+        .tolls-count { background: rgba(176,138,255,0.12); border: 1px solid rgba(176,138,255,0.25); color: var(--purple); padding: 1px 7px; border-radius: 10px; }
+        .toll-item { display: flex; align-items: center; gap: 10px; background: var(--bg); padding: 9px 11px; border-radius: 7px; border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; }
+        .toll-item:hover { border-color: var(--accent); background: rgba(77,159,255,0.04); }
+        .toll-item.selected { border-color: var(--green); background: rgba(61,220,132,0.05); }
+        .toll-item input[type="checkbox"] { appearance: none; width: 16px; height: 16px; border: 2px solid var(--border2); border-radius: 4px; cursor: pointer; flex-shrink: 0; transition: all 0.15s; position: relative; }
+        .toll-item input[type="checkbox"]:checked { background: var(--green); border-color: var(--green); }
+        .toll-item input[type="checkbox"]:checked::after { content: '✓'; color: #0a0e14; font-size: 10px; font-weight: 900; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+        .toll-item-ro { display: flex; align-items: center; gap: 10px; background: rgba(61,220,132,0.04); padding: 9px 11px; border-radius: 7px; border: 1px solid rgba(61,220,132,0.18); }
+        .toll-details { flex: 1; }
+        .toll-datetime { font-family: var(--font-mono); font-size: 0.76rem; font-weight: 600; color: var(--text); margin-bottom: 2px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+        .toll-desc { font-size: 0.72rem; color: var(--text-muted); }
+        .toll-name-tag { display: inline-block; background: rgba(176,138,255,0.12); border: 1px solid rgba(176,138,255,0.25); color: var(--purple); padding: 1px 7px; border-radius: 4px; font-size: 0.65rem; font-family: var(--font-mono); margin-top: 3px; }
+        .toll-amount { font-family: var(--font-mono); font-weight: 700; font-size: 0.92rem; padding: 4px 10px; border-radius: 5px; white-space: nowrap; }
+        .toll-amount-pending { color: var(--accent2); background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.2); }
+        .toll-amount-updated { color: var(--green);   background: rgba(61,220,132,0.08);  border: 1px solid rgba(61,220,132,0.2); }
+        .toll-time-edit-input { font-family: var(--font-mono); font-size: 0.73rem; background: var(--surface); border: 1px solid var(--accent); color: var(--text); padding: 3px 7px; border-radius: 4px; outline: none; width: 148px; display: none; }
+        .toll-time-edit-input.visible { display: block; }
+        .btn-tiny { padding: 2px 6px; font-size: 0.65rem; border-radius: 3px; border: none; cursor: pointer; font-family: var(--font-mono); }
+        .btn-edit-time   { background: rgba(77,159,255,0.12);  color: var(--accent); }
+        .btn-save-time   { background: rgba(61,220,132,0.15);  color: var(--green); }
+        .btn-cancel-time { background: rgba(255,107,107,0.12); color: var(--accent2); }
+        .btn-link { background: linear-gradient(135deg,#3ddc84,#2ab96a); color: #0a0e14; border: none; padding: 9px; font-weight: 700; border-radius: 7px; cursor: pointer; font-size: 0.83rem; font-family: var(--font-main); transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 2px; }
+        .btn-link:hover { background: linear-gradient(135deg,#5aeba0,#3ddc84); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(61,220,132,0.25); }
+        .btn-link:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+        .linked-total { background: rgba(61,220,132,0.07); border: 1px solid rgba(61,220,132,0.25); border-radius: 6px; padding: 8px 12px; display: flex; align-items: center; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+        .linked-total-label { font-size: 0.72rem; color: var(--green); font-weight: 700; font-family: var(--font-mono); }
+        .linked-total-val   { font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: var(--text); }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
     </style>
 </head>
 <body>
-    <div id="sidebar-target"></div>
 
-    <div class="dashboard-container" style="margin-left: 270px;">
-        <div class="header">
-            <h2><i class="fa-solid fa-road-barrier"></i> Fastag / Toll Mapper (± 1.5 Hrs)</h2>
-            <button class="btn-refresh" onclick="loadTollMatches()"><i class="fa-solid fa-rotate"></i> Refresh Matches</button>
+<!-- TOPBAR -->
+<div class="topbar">
+    <div class="topbar-left">
+        <div class="topbar-brand">
+            <i class="fa-solid fa-receipt" style="font-size:0.8rem;"></i>
+            TOLL AUDIT
         </div>
+        <div class="tabs">
+            <button class="tab-btn active" id="tab-pending" onclick="switchTab('pending')">
+                <i class="fa-solid fa-clock" style="font-size:0.72rem;"></i> Pending
+                <span class="tab-count" id="count-pending">—</span>
+            </button>
+            <button class="tab-btn" id="tab-updated" onclick="switchTab('updated')">
+                <i class="fa-solid fa-circle-check" style="font-size:0.72rem;"></i> Updated
+                <span class="tab-count" id="count-updated">—</span>
+            </button>
+        </div>
+    </div>
+    <div class="topbar-right">
+        <button class="btn btn-ghost" id="btn-filters" onclick="toggleFilters()">
+            <i class="fa-solid fa-sliders"></i> Filters
+        </button>
+        <button class="btn btn-primary" id="btn-refresh" onclick="applyAndLoad()" disabled>
+            <i class="fa-solid fa-rotate"></i> Refresh
+        </button>
+    </div>
+</div>
 
-        <div id="mapping-grid" class="grid-container">
-            <div class="loader"><i class="fa-solid fa-spinner fa-spin"></i> Finding matching tolls based on time and vehicle...</div>
+<!-- FILTER PANEL (hidden until toggled) -->
+<div class="filter-panel" id="filter-panel" style="display:none;">
+
+    <!-- Date (required) -->
+    <div class="filter-group">
+        <label><i class="fa-regular fa-calendar" style="color:var(--yellow);"></i> Shift Date <span style="color:var(--accent2);font-size:0.65rem;">*required</span></label>
+        <div class="ms-wrap" id="wrap-date">
+            <div class="ms-trigger required-empty" id="trig-date" onclick="msToggle('date')">
+                <span class="ms-trigger-text required-hint" id="text-date">Select a date…</span>
+                <i class="fa-solid fa-chevron-down ms-trigger-chevron"></i>
+            </div>
+            <div class="ms-dropdown" id="drop-date">
+                <input class="ms-search" placeholder="Search date…" oninput="msSearch('date',this.value)" onclick="event.stopPropagation()">
+                <div class="ms-list" id="list-date"><div class="ms-no-results"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div></div>
+            </div>
         </div>
     </div>
 
-    <script src="/components-static/Sidebar.js"></script>
-    <script>
-        async function loadTollMatches() {
-            const grid = document.getElementById('mapping-grid');
-            grid.innerHTML = '<div class="loader"><i class="fa-solid fa-spinner fa-spin"></i> Calculating matches...</div>';
+    <!-- Time gap slider -->
+    <div class="gap-group">
+        <label><i class="fa-solid fa-clock-rotate-left" style="color:var(--purple);"></i> Match Time Gap</label>
+        <div class="gap-control">
+            <span class="gap-value" id="gap-display">± 1h 30m</span>
+            <input type="range" class="gap-slider" id="gap-slider"
+                min="0" max="9" step="1" value="2"
+                oninput="onGapChange(this.value)">
+        </div>
+    </div>
 
-            try {
-                const response = await fetch('/api/toll/potential_matches');
-                const matches = await response.json();
+    <div class="filter-divider"></div>
 
-                grid.innerHTML = '';
-                if(matches.length === 0) {
-                    grid.innerHTML = '<div class="loader">No unmapped tolls found within a 1.5-hour window for existing trips! 🎉</div>';
-                    return;
-                }
+    <!-- Direction -->
+    <div class="filter-group">
+        <label><i class="fa-solid fa-arrows-left-right"></i> Direction</label>
+        <div class="ms-wrap"><div class="ms-trigger" id="trig-direction" onclick="msToggle('direction')"><span class="ms-trigger-text" id="text-direction">All</span><i class="fa-solid fa-chevron-down ms-trigger-chevron"></i></div><div class="ms-dropdown" id="drop-direction"><input class="ms-search" placeholder="Search…" oninput="msSearch('direction',this.value)" onclick="event.stopPropagation()"><div class="ms-list" id="list-direction"></div><div class="ms-footer"><button class="ms-btn-all" onclick="msSelectAll('direction')">All</button><button onclick="msClear('direction')">Clear</button></div></div></div>
+    </div>
 
-                matches.forEach(data => {
-                    const trip = data.trip;
-                    const tolls = data.tolls;
-                    
-                    const card = document.createElement('div');
-                    card.className = 'mapping-card';
-                    card.id = `card-${trip.unique_id}`;
-                    
-                    // Generate Toll Checkboxes (Unchecked by default)
-                    let tollsHtml = tolls.map(t => `
-                        <label class="toll-item">
-                            <input type="checkbox" class="toll-checkbox-${trip.unique_id}" value="${t.id}">
-                            <div class="toll-details">
-                                <strong style="color:#0f172a;"><i class="fa-regular fa-clock"></i> ${t.travel_date_time}</strong><br>
-                                <span style="color:#475569;">${t.transaction_description}</span>
-                            </div>
-                            <div class="toll-amount">₹${t.amount}</div>
-                        </label>
-                    `).join('');
+    <!-- Office -->
+    <div class="filter-group">
+        <label><i class="fa-regular fa-building"></i> Office</label>
+        <div class="ms-wrap"><div class="ms-trigger" id="trig-office" onclick="msToggle('office')"><span class="ms-trigger-text" id="text-office">All</span><i class="fa-solid fa-chevron-down ms-trigger-chevron"></i></div><div class="ms-dropdown" id="drop-office"><input class="ms-search" placeholder="Search…" oninput="msSearch('office',this.value)" onclick="event.stopPropagation()"><div class="ms-list" id="list-office"></div><div class="ms-footer"><button class="ms-btn-all" onclick="msSelectAll('office')">All</button><button onclick="msClear('office')">Clear</button></div></div></div>
+    </div>
 
-card.innerHTML = `
-                        <div class="trip-info">
-                            <h4><i class="fa-solid fa-car"></i> Cab: ${trip.cab_reg_no}</h4>
-                            <div class="trip-detail"><span>Trip ID:</span> <strong>${trip.trip_id}</strong></div>
-                            <div class="trip-detail"><span>Emp:</span> <strong>${trip.employee_name} (${trip.employee_id})</strong></div>
-                            
-                            <div class="trip-detail" style="color: #616161; margin-top: 4px;">
-                                <span>Office:</span> <strong><i class="fa-regular fa-building"></i> ${trip.office || 'N/A'}</strong>
-                            </div>
-                            
-                            <div class="trip-detail" style="margin-top: 8px; color:#1565c0;">
-                                <i class="fa-solid fa-calendar-day"></i> Shift: <strong>${trip.shift_date} ${trip.shift_time}</strong>
-                            </div>
-                            
-                            <div class="trip-detail" style="display:flex; gap: 15px; margin-top: 4px;">
-                                <span style="color: #059669;"><i class="fa-solid fa-arrow-up"></i> P: <strong>${trip.pickup_time || '--:--'}</strong></span>
-                                <span style="color: #dc2626;"><i class="fa-solid fa-arrow-down"></i> D: <strong>${trip.drop_time || '--:--'}</strong></span>
-                            </div>
+    <!-- Landmark -->
+    <div class="filter-group">
+        <label><i class="fa-solid fa-map-pin"></i> Landmark</label>
+        <div class="ms-wrap"><div class="ms-trigger" id="trig-landmark" onclick="msToggle('landmark')"><span class="ms-trigger-text" id="text-landmark">All</span><i class="fa-solid fa-chevron-down ms-trigger-chevron"></i></div><div class="ms-dropdown" id="drop-landmark"><input class="ms-search" placeholder="Search…" oninput="msSearch('landmark',this.value)" onclick="event.stopPropagation()"><div class="ms-list" id="list-landmark"></div><div class="ms-footer"><button class="ms-btn-all" onclick="msSelectAll('landmark')">All</button><button onclick="msClear('landmark')">Clear</button></div></div></div>
+    </div>
 
-                            <div class="address-box">
-                                <strong><i class="fa-solid fa-map-pin" style="color:red;"></i> ${trip.landmark || 'No Landmark'}</strong><br>
-                                <span style="color:#666;">${trip.address}</span>
-                            </div>
-                        </div>
-                        
-                        <div class="toll-options">
-                            <h4><i class="fa-solid fa-receipt"></i> Discovered Tolls (±1.5h)</h4>
-                            ${tollsHtml}
-                            <button class="btn-save" onclick="saveTolls('${trip.unique_id}')">
-                                <i class="fa-solid fa-link"></i> Link Selected Tolls
-                            </button>
-                        </div>
-                    `;
-                    grid.appendChild(card);
-                });
+    <!-- Cab -->
+    <div class="filter-group">
+        <label><i class="fa-solid fa-car"></i> Cab Reg</label>
+        <div class="ms-wrap"><div class="ms-trigger" id="trig-cab" onclick="msToggle('cab')"><span class="ms-trigger-text" id="text-cab">All</span><i class="fa-solid fa-chevron-down ms-trigger-chevron"></i></div><div class="ms-dropdown" id="drop-cab"><input class="ms-search" placeholder="Search…" oninput="msSearch('cab',this.value)" onclick="event.stopPropagation()"><div class="ms-list" id="list-cab"></div><div class="ms-footer"><button class="ms-btn-all" onclick="msSelectAll('cab')">All</button><button onclick="msClear('cab')">Clear</button></div></div></div>
+    </div>
 
-            } catch(e) {
-                grid.innerHTML = '<div class="loader" style="color:red;">Error loading Toll data. Check Terminal logs.</div>';
-            }
+    <!-- Toll Name -->
+    <div class="filter-group">
+        <label><i class="fa-solid fa-receipt"></i> Toll Name</label>
+        <div class="ms-wrap"><div class="ms-trigger" id="trig-toll" onclick="msToggle('toll')"><span class="ms-trigger-text" id="text-toll">All</span><i class="fa-solid fa-chevron-down ms-trigger-chevron"></i></div><div class="ms-dropdown" id="drop-toll"><input class="ms-search" placeholder="Search…" oninput="msSearch('toll',this.value)" onclick="event.stopPropagation()"><div class="ms-list" id="list-toll"></div><div class="ms-footer"><button class="ms-btn-all" onclick="msSelectAll('toll')">All</button><button onclick="msClear('toll')">Clear</button></div></div></div>
+    </div>
+
+    <!-- Trip ID -->
+    <div class="filter-group">
+        <label><i class="fa-solid fa-hashtag"></i> Trip ID</label>
+        <div class="ms-wrap"><div class="ms-trigger" id="trig-tripid" onclick="msToggle('tripid')"><span class="ms-trigger-text" id="text-tripid">All</span><i class="fa-solid fa-chevron-down ms-trigger-chevron"></i></div><div class="ms-dropdown" id="drop-tripid"><input class="ms-search" placeholder="Search…" oninput="msSearch('tripid',this.value)" onclick="event.stopPropagation()"><div class="ms-list" id="list-tripid"></div><div class="ms-footer"><button class="ms-btn-all" onclick="msSelectAll('tripid')">All</button><button onclick="msClear('tripid')">Clear</button></div></div></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="filter-actions">
+        <button class="btn btn-green" id="btn-apply" onclick="applyAndLoad()" disabled>
+            <i class="fa-solid fa-bolt"></i> Load Data
+        </button>
+        <button class="btn btn-ghost" onclick="clearSecondaryFilters()">
+            <i class="fa-solid fa-xmark"></i> Clear
+        </button>
+    </div>
+</div>
+
+<!-- ACTIVE FILTER CHIPS -->
+<div class="active-filters" id="active-filters" style="display:none;"></div>
+
+<!-- STATS BAR -->
+<div class="stats-bar" id="stats-bar" style="display:none;">
+    <div class="stat-item"><i class="fa-solid fa-layer-group" style="color:var(--accent);"></i> Showing: <strong id="stat-showing">—</strong></div>
+    <div class="stat-divider"></div>
+    <div class="stat-item"><i class="fa-solid fa-receipt" style="color:var(--purple);"></i> Tolls: <strong id="stat-tolls">—</strong></div>
+    <div class="stat-divider"></div>
+    <div class="stat-item"><i class="fa-solid fa-indian-rupee-sign" style="color:var(--green);"></i> Total: <strong id="stat-amount">—</strong></div>
+    <div class="stat-divider"></div>
+    <div class="stat-item"><i class="fa-regular fa-calendar" style="color:var(--yellow);"></i> Date: <strong id="stat-date">—</strong></div>
+    <div class="stat-divider"></div>
+    <div class="stat-item"><i class="fa-solid fa-clock" style="color:var(--purple);"></i> Gap: <strong id="stat-gap">—</strong></div>
+</div>
+
+<!-- PAGES -->
+<div class="page active" id="page-pending">
+    <div class="main-content" id="grid-pending">
+        <div class="date-landing">
+            <div class="date-landing-icon"><i class="fa-regular fa-calendar-days"></i></div>
+            <h2>Select a date to load toll matches</h2>
+            <p>Data loads only after you pick a date and click <strong>Load Data</strong>. Only trips with matching tolls are shown.</p>
+            <div class="landing-steps">
+                <div class="landing-step"><span class="landing-step-num">1</span> Pick a <strong>Shift Date</strong> from the filter above</div>
+                <div class="landing-step"><span class="landing-step-num">2</span> Adjust the <strong>Match Time Gap</strong> if needed (default ±1h 30m)</div>
+                <div class="landing-step"><span class="landing-step-num">3</span> Click <strong>Load Data</strong> to fetch matches</div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="page" id="page-updated">
+    <div class="main-content" id="grid-updated">
+        <div class="date-landing">
+            <div class="date-landing-icon"><i class="fa-regular fa-calendar-days"></i></div>
+            <h2>Select a date to view linked tolls</h2>
+        </div>
+    </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════
+let allMatches      = [];   // raw from API (already date+gap filtered by server)
+let filteredMatches = [];   // after client-side secondary filters
+let currentTab      = 'pending';
+let isLoading       = false;
+let loadedDate      = null;
+let loadedGap       = null;
+
+// Time gap steps: 20-min increments from 1h to 4h → 0=1h, 1=1h20, ... 9=4h
+const GAP_STEPS = [1.0, 1.333, 1.667, 2.0, 2.333, 2.667, 3.0, 3.333, 3.667, 4.0];
+function gapLabel(idx) {
+    const h = GAP_STEPS[idx];
+    const hrs = Math.floor(h);
+    const mins = Math.round((h - hrs) * 60);
+    return mins === 0 ? `± ${hrs}h` : `± ${hrs}h ${mins}m`;
+}
+function gapHours(idx) { return GAP_STEPS[idx]; }
+
+// ══════════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════════
+function safeStr(v) { return (v === null || v === undefined) ? '' : String(v); }
+
+function isTollUpdated(data) {
+    if (data._linked === true) return true;
+    const tn = safeStr(data.trip.toll_name).trim().toLowerCase();
+    return tn !== '' && tn !== 'none' && tn !== 'null' && tn !== 'nan';
+}
+
+function normalizeDate(raw) {
+    if (!raw) return '';
+    let s = raw.toString().trim().split(/[\sT]/)[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})$/);
+    if (m) { const yr = m[3].length===2?'20'+m[3]:m[3]; return `${yr}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
+    try { const d = new Date(s); if (!isNaN(d)) return d.toISOString().slice(0,10); } catch(e) {}
+    return s;
+}
+
+function formatDateLabel(d) {
+    try {
+        const nd = normalizeDate(d);
+        const dt = new Date(nd + 'T00:00:00');
+        if (isNaN(dt)) return d;
+        return dt.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+    } catch(e) { return d; }
+}
+
+function getDirectionClass(dir) {
+    if (!dir) return 'direction-in';
+    const d = dir.toUpperCase();
+    if (d.includes('PICKUP')||d.includes('PU')) return 'direction-pickup';
+    if (d.includes('DROP')||d.includes('DR'))   return 'direction-drop';
+    if (d === 'OUT') return 'direction-out';
+    return 'direction-in';
+}
+function getDirectionIcon(dir) {
+    if (!dir) return 'fa-arrow-right';
+    const d = dir.toUpperCase();
+    if (d.includes('PICKUP')||d.includes('PU')) return 'fa-arrow-up-from-dot';
+    if (d.includes('DROP')||d.includes('DR'))   return 'fa-arrow-down-to-dot';
+    if (d === 'OUT') return 'fa-arrow-right-from-bracket';
+    return 'fa-arrow-right-to-bracket';
+}
+
+// ══════════════════════════════════════════════════════
+//  GAP SLIDER
+// ══════════════════════════════════════════════════════
+function onGapChange(idx) {
+    document.getElementById('gap-display').textContent = gapLabel(parseInt(idx));
+}
+
+// ══════════════════════════════════════════════════════
+//  MULTI-SELECT ENGINE
+// ══════════════════════════════════════════════════════
+// "date" is single-select (radio-like) — others are multi
+const SINGLE_SELECT = new Set(['date']);
+
+const msState = {
+    date: new Set(), direction: new Set(), office: new Set(),
+    landmark: new Set(), cab: new Set(), toll: new Set(), tripid: new Set()
+};
+const msOptions = {
+    date: [], direction: [], office: [],
+    landmark: [], cab: [], toll: [], tripid: []
+};
+
+function msToggle(key) {
+    const dd = document.getElementById('drop-' + key);
+    const tr = document.getElementById('trig-' + key);
+    const wasOpen = dd.classList.contains('open');
+    document.querySelectorAll('.ms-dropdown.open').forEach(e => e.classList.remove('open'));
+    document.querySelectorAll('.ms-trigger.open').forEach(e => e.classList.remove('open'));
+    if (!wasOpen) {
+        dd.classList.add('open'); tr.classList.add('open');
+        const s = dd.querySelector('.ms-search'); if (s) { s.value = ''; s.focus(); }
+        msRenderList(key, '');
+    }
+}
+document.addEventListener('click', e => {
+    if (!e.target.closest('.ms-wrap')) {
+        document.querySelectorAll('.ms-dropdown.open').forEach(el => el.classList.remove('open'));
+        document.querySelectorAll('.ms-trigger.open').forEach(el => el.classList.remove('open'));
+    }
+});
+
+function msRenderList(key, search) {
+    const listEl  = document.getElementById('list-' + key);
+    const sel     = msState[key];
+    const lower   = search.toLowerCase();
+    const visible = msOptions[key].filter(v => v.toLowerCase().includes(lower));
+    if (!visible.length) { listEl.innerHTML = '<div class="ms-no-results">No results</div>'; return; }
+
+    if (SINGLE_SELECT.has(key)) {
+        // Radio-style for date
+        listEl.innerHTML = visible.map(v => {
+            const esc = v.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            const label = (key === 'date') ? formatDateLabel(v) : v;
+            const checked = sel.has(v);
+            return `<label class="ms-option" onclick="event.stopPropagation()">
+                <input type="radio" name="ms-radio-${key}" ${checked ? 'checked' : ''}
+                    onchange="msSetSingle('${key}','${esc}')">
+                <span>${label}</span></label>`;
+        }).join('');
+    } else {
+        listEl.innerHTML = visible.map(v => {
+            const esc = v.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            return `<label class="ms-option" onclick="event.stopPropagation()">
+                <input type="checkbox" ${sel.has(v) ? 'checked' : ''}
+                    onchange="msToggleOption('${key}','${esc}',this.checked)">
+                <span>${v}</span></label>`;
+        }).join('');
+    }
+}
+
+function msSetSingle(key, val) {
+    // Single select: pick one, close dropdown, update label
+    msState[key].clear();
+    msState[key].add(val);
+    msUpdateLabel(key);
+    // Close dropdown
+    document.querySelectorAll('.ms-dropdown.open').forEach(e => e.classList.remove('open'));
+    document.querySelectorAll('.ms-trigger.open').forEach(e => e.classList.remove('open'));
+    // Enable Load Data button
+    checkEnableLoad();
+}
+
+function msSearch(key, val) { msRenderList(key, val); }
+function msToggleOption(key, val, checked) {
+    if (checked) msState[key].add(val); else msState[key].delete(val);
+    msUpdateLabel(key);
+    // Secondary filters re-filter client-side immediately (no reload)
+    if (key !== 'date') clientFilter();
+}
+function msSelectAll(key) {
+    msOptions[key].forEach(v => msState[key].add(v));
+    const s = document.querySelector(`#drop-${key} .ms-search`);
+    msRenderList(key, s ? s.value : ''); msUpdateLabel(key);
+    if (key !== 'date') clientFilter();
+}
+function msClear(key) {
+    msState[key].clear();
+    const s = document.querySelector(`#drop-${key} .ms-search`);
+    msRenderList(key, s ? s.value : ''); msUpdateLabel(key);
+    if (key !== 'date') clientFilter();
+    if (key === 'date') checkEnableLoad();
+}
+
+function msUpdateLabel(key) {
+    const el  = document.getElementById('text-' + key);
+    const tr  = document.getElementById('trig-' + key);
+    const sel = msState[key];
+
+    if (!sel.size) {
+        if (key === 'date') {
+            el.textContent = 'Select a date…';
+            el.className = 'ms-trigger-text required-hint';
+            tr.classList.add('required-empty');
+        } else {
+            el.textContent = 'All';
+            el.className = 'ms-trigger-text';
         }
+    } else if (key === 'date') {
+        el.textContent = formatDateLabel([...sel][0]);
+        el.className = 'ms-trigger-text has-selection';
+        tr.classList.remove('required-empty');
+    } else if (sel.size === 1) {
+        el.textContent = [...sel][0];
+        el.className = 'ms-trigger-text has-selection';
+    } else {
+        el.textContent = `${sel.size} selected`;
+        el.className = 'ms-trigger-text has-selection';
+    }
+}
 
-        async function saveTolls(tripUniqueId) {
-            const checkboxes = document.querySelectorAll(`.toll-checkbox-${tripUniqueId}:checked`);
-            const selectedTollIds = Array.from(checkboxes).map(cb => cb.value);
+function toggleFilters() {
+    const p = document.getElementById('filter-panel');
+    const btn = document.getElementById('btn-filters');
+    const isOpen = p.style.display !== 'none';
+    p.style.display = isOpen ? 'none' : 'flex';
+    btn.style.borderColor = isOpen ? '' : 'var(--accent)';
+    btn.style.color       = isOpen ? '' : 'var(--accent)';
+}
 
-            if (selectedTollIds.length === 0) {
-                alert("Please select at least one toll to link!");
-                return;
-            }
+function checkEnableLoad() {
+    const hasDate = msState.date.size > 0;
+    document.getElementById('btn-apply').disabled   = !hasDate || isLoading;
+    document.getElementById('btn-refresh').disabled = !hasDate || isLoading;
+}
 
-            try {
-                const response = await fetch('/api/toll/mark', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        trip_unique_id: tripUniqueId, 
-                        selected_toll_ids: selectedTollIds 
-                    })
-                });
-                
-                if (response.ok) {
-                    document.getElementById(`card-${tripUniqueId}`).remove(); // Instantly hide mapped row
-                } else {
-                    alert("Failed to link tolls. Check server logs.");
-                }
-            } catch (e) {
-                alert("Connection Error");
-            }
+// ══════════════════════════════════════════════════════
+//  CLIENT-SIDE SECONDARY FILTER (direction/office/etc.)
+// ══════════════════════════════════════════════════════
+function clientFilter() {
+    filteredMatches = allMatches.filter(m => {
+        const t = m.trip;
+        if (msState.direction.size > 0 && !msState.direction.has(safeStr(t.trip_direction).toUpperCase().trim())) return false;
+        if (msState.office.size > 0    && !msState.office.has(safeStr(t.office).trim())) return false;
+        if (msState.landmark.size > 0  && !msState.landmark.has(safeStr(t.landmark).trim())) return false;
+        if (msState.cab.size > 0       && !msState.cab.has(safeStr(t.cab_reg_no).trim())) return false;
+        if (msState.toll.size > 0      && !m.tolls.some(tl => msState.toll.has(safeStr(tl.toll_name || tl.transaction_description).trim()))) return false;
+        if (msState.tripid.size > 0    && !msState.tripid.has(safeStr(t.trip_id || t.unique_id).trim())) return false;
+        return true;
+    });
+    renderGrids(filteredMatches);
+    renderChips();
+}
+
+function clearSecondaryFilters() {
+    ['direction','office','landmark','cab','toll','tripid'].forEach(k => {
+        msState[k].clear(); msUpdateLabel(k); msRenderList(k, '');
+    });
+    clientFilter();
+}
+
+// ══════════════════════════════════════════════════════
+//  POPULATE SECONDARY FILTER OPTIONS FROM LOADED DATA
+// ══════════════════════════════════════════════════════
+function populateSecondaryFilters(matches) {
+    msOptions.direction = [...new Set(matches.map(m => safeStr(m.trip.trip_direction).toUpperCase().trim()).filter(Boolean))].sort();
+    msOptions.office    = [...new Set(matches.map(m => safeStr(m.trip.office).trim()).filter(Boolean))].sort();
+    msOptions.landmark  = [...new Set(matches.map(m => safeStr(m.trip.landmark).trim()).filter(Boolean))].sort();
+    msOptions.cab       = [...new Set(matches.map(m => safeStr(m.trip.cab_reg_no).trim()).filter(Boolean))].sort();
+    msOptions.toll      = [...new Set(matches.flatMap(m => m.tolls.map(t => safeStr(t.toll_name || t.transaction_description).trim())).filter(Boolean))].sort();
+    msOptions.tripid    = [...new Set(matches.map(m => safeStr(m.trip.trip_id || m.trip.unique_id).trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b, undefined, {numeric:true}));
+    ['direction','office','landmark','cab','toll','tripid'].forEach(k => msRenderList(k, ''));
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER CHIPS
+// ══════════════════════════════════════════════════════
+function renderChips() {
+    const bar = document.getElementById('active-filters');
+    const labels = { direction:'Dir', office:'Office', landmark:'Landmark', cab:'Cab', toll:'Toll', tripid:'Trip ID' };
+    const chips = [];
+
+    // Date chip (always shown after load)
+    if (loadedDate) {
+        chips.push(`<div class="filter-chip chip-date"><i class="fa-regular fa-calendar"></i> ${formatDateLabel(loadedDate)}</div>`);
+    }
+    // Gap chip
+    if (loadedGap !== null) {
+        chips.push(`<div class="filter-chip chip-gap"><i class="fa-solid fa-clock"></i> ${loadedGap}</div>`);
+    }
+    // Secondary filters
+    ['direction','office','landmark','cab','toll','tripid'].forEach(key => {
+        const sel = msState[key];
+        if (!sel.size) return;
+        const val = sel.size === 1 ? [...sel][0] : `${sel.size} selected`;
+        chips.push(`<div class="filter-chip">${labels[key]}: ${val}<button onclick="msClear('${key}')">×</button></div>`);
+    });
+
+    if (!chips.length) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+    bar.innerHTML = chips.join('');
+}
+
+// ══════════════════════════════════════════════════════
+//  TABS & STATS
+// ══════════════════════════════════════════════════════
+function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    document.getElementById('page-' + tab).classList.add('active');
+    updateStats(filteredMatches);
+}
+
+function updateStats(matches) {
+    const view = currentTab === 'pending'
+        ? matches.filter(m => !isTollUpdated(m))
+        : matches.filter(m =>  isTollUpdated(m));
+    const tt = view.reduce((s, m) => s + m.tolls.length, 0);
+    const ta = view.reduce((s, m) => s + m.tolls.reduce((sa, t) => sa + parseFloat(t.amount || 0), 0), 0);
+    document.getElementById('stat-showing').textContent = view.length + ' trips';
+    document.getElementById('stat-tolls').textContent   = tt;
+    document.getElementById('stat-amount').textContent  = '₹' + ta.toLocaleString('en-IN', {maximumFractionDigits:2});
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER GRIDS
+// ══════════════════════════════════════════════════════
+function renderGrids(matches) {
+    const pending = matches.filter(m => !isTollUpdated(m));
+    const updated = matches.filter(m =>  isTollUpdated(m));
+
+    document.getElementById('count-pending').textContent = pending.length;
+    document.getElementById('count-updated').textContent = updated.length;
+
+    const pg = document.getElementById('grid-pending');
+    pg.innerHTML = '';
+    if (!pending.length) {
+        pg.innerHTML = `<div class="empty-state"><i class="fa-solid fa-circle-check" style="color:var(--green);"></i><h3>All Clear!</h3><p>No pending toll matches for this date and gap.</p></div>`;
+    } else { pending.forEach(d => renderCard(d, pg, false)); }
+
+    const ug = document.getElementById('grid-updated');
+    ug.innerHTML = '';
+    if (!updated.length) {
+        ug.innerHTML = `<div class="empty-state"><i class="fa-solid fa-receipt" style="color:var(--text-muted);"></i><h3>Nothing Updated Yet</h3><p>Linked tolls will appear here.</p></div>`;
+    } else { updated.forEach(d => renderCard(d, ug, true)); }
+
+    updateStats(matches);
+}
+
+// ══════════════════════════════════════════════════════
+//  TIME EDIT
+// ══════════════════════════════════════════════════════
+function toggleTimeEdit(tripId, mode) {
+    const row=document.getElementById(`time-edit-row-${tripId}`);
+    const bE=document.getElementById(`time-btn-edit-${tripId}`);
+    const bS=document.getElementById(`time-btn-save-${tripId}`);
+    const bC=document.getElementById(`time-btn-cancel-${tripId}`);
+    const puD=document.getElementById(`pu-display-${tripId}`);
+    const drD=document.getElementById(`dr-display-${tripId}`);
+    const puI=document.getElementById(`pu-input-${tripId}`);
+    const drI=document.getElementById(`dr-input-${tripId}`);
+    if (mode==='edit') {
+        puI.value=puD.textContent.trim().replace('--:--','').slice(0,5);
+        drI.value=drD.textContent.trim().replace('--:--','').slice(0,5);
+        row.classList.add('visible'); bE.style.display='none';
+        bS.style.display=bC.style.display='inline-block'; puI.focus();
+    } else if (mode==='save') {
+        const re=/^\d{2}:\d{2}(:\d{2})?$/; let ok=true;
+        if (puI.value&&!re.test(puI.value)){puI.classList.add('err');ok=false;}else puI.classList.remove('err');
+        if (drI.value&&!re.test(drI.value)){drI.classList.add('err');ok=false;}else drI.classList.remove('err');
+        if (!ok) return;
+        puD.textContent=puI.value||'--:--'; drD.textContent=drI.value||'--:--';
+        row.classList.remove('visible'); bE.style.display='inline-block'; bS.style.display=bC.style.display='none';
+    } else {
+        row.classList.remove('visible'); bE.style.display='inline-block'; bS.style.display=bC.style.display='none';
+    }
+}
+function toggleTollTimeEdit(tollId, mode) {
+    const disp=document.getElementById(`toll-time-display-${tollId}`);
+    const inp=document.getElementById(`toll-time-input-${tollId}`);
+    const bE=document.getElementById(`toll-time-edit-${tollId}`);
+    const bS=document.getElementById(`toll-time-save-${tollId}`);
+    const bC=document.getElementById(`toll-time-cancel-${tollId}`);
+    if (mode==='edit'){inp.value=disp.textContent.trim();inp.classList.add('visible');disp.style.display='none';bE.style.display='none';bS.style.display=bC.style.display='inline-block';}
+    else if (mode==='save'){disp.textContent=inp.value.trim()||disp.textContent;inp.classList.remove('visible');disp.style.display='inline';bE.style.display='inline-block';bS.style.display=bC.style.display='none';}
+    else{inp.classList.remove('visible');disp.style.display='inline';bE.style.display='inline-block';bS.style.display=bC.style.display='none';}
+}
+function toggleTollSelect(label) {
+    const cb = label.querySelector('input[type="checkbox"]');
+    if (cb) setTimeout(() => { cb.checked ? label.classList.add('selected') : label.classList.remove('selected'); }, 0);
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER CARD
+// ══════════════════════════════════════════════════════
+function renderCard(data, container, isUpdated) {
+    const trip=data.trip, tolls=data.tolls;
+    const dc=getDirectionClass(trip.trip_direction);
+    const di=getDirectionIcon(trip.trip_direction);
+    const dl=safeStr(trip.trip_direction||'N/A').toUpperCase();
+    const totalAmt=tolls.reduce((s,t)=>s+parseFloat(t.amount||0),0);
+    const tripId=safeStr(trip.unique_id);
+
+    const tollsHtml = tolls.map(t => {
+        const tId=safeStr(t.id);
+        const nameTag=(t.toll_name||trip.toll_name)?`<div class="toll-name-tag"><i class="fa-solid fa-road"></i> ${t.toll_name||trip.toll_name}</div>`:'';
+        const dtDisplay=safeStr(t.travel_date_time||'—');
+        const desc=safeStr(t.transaction_description||'—');
+        const amount=parseFloat(t.amount||0).toLocaleString('en-IN',{maximumFractionDigits:2});
+        if (isUpdated) {
+            return `<div class="toll-item-ro"><div class="toll-details"><div class="toll-datetime">${dtDisplay}</div><div class="toll-desc">${desc}</div>${nameTag}</div><div class="toll-amount toll-amount-updated">₹${amount}</div></div>`;
         }
+        return `<label class="toll-item" id="toll-item-${tId}" onclick="toggleTollSelect(this)">
+            <input type="checkbox" class="toll-checkbox-${tripId}" value="${tId}">
+            <div class="toll-details">
+                <div class="toll-datetime">
+                    <span id="toll-time-display-${tId}">${dtDisplay}</span>
+                    <button class="btn-tiny btn-edit-time" id="toll-time-edit-${tId}" onclick="event.preventDefault();event.stopPropagation();toggleTollTimeEdit('${tId}','edit')"><i class="fa-regular fa-pen-to-square"></i></button>
+                    <button class="btn-tiny btn-save-time" id="toll-time-save-${tId}" style="display:none;" onclick="event.preventDefault();event.stopPropagation();toggleTollTimeEdit('${tId}','save')">✓</button>
+                    <button class="btn-tiny btn-cancel-time" id="toll-time-cancel-${tId}" style="display:none;" onclick="event.preventDefault();event.stopPropagation();toggleTollTimeEdit('${tId}','cancel')">✕</button>
+                </div>
+                <input type="text" class="toll-time-edit-input" id="toll-time-input-${tId}" onclick="event.stopPropagation();" placeholder="DD-MM-YYYY HH:MM:SS">
+                <div class="toll-desc">${desc}</div>${nameTag}
+            </div>
+            <div class="toll-amount toll-amount-pending">₹${amount}</div>
+        </label>`;
+    }).join('');
 
-        document.addEventListener('DOMContentLoaded', loadTollMatches);
-    </script>
+    const card = document.createElement('div');
+    card.className = 'mapping-card' + (isUpdated ? ' is-updated' : '');
+    card.id = `card-${tripId}`;
+    card.innerHTML = `
+    <div class="card-header">
+        <div class="card-header-left">
+            <span class="cab-reg"><i class="fa-solid fa-car-side"></i> ${safeStr(trip.cab_reg_no||'—')}</span>
+            ${trip.cab_type?`<span class="pill pill-yellow">${trip.cab_type}</span>`:''}
+            ${isUpdated?`<span class="updated-badge"><i class="fa-solid fa-circle-check"></i> UPDATED</span>`:''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="pill pill-blue"><i class="fa-regular fa-calendar"></i> ${safeStr(trip.shift_date||'—')}</span>
+            <span style="font-family:var(--font-mono);font-size:0.76rem;color:var(--text-muted);">ID: ${safeStr(trip.trip_id||trip.unique_id||'—')}</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="trip-info">
+            <div class="meta-row">
+                <span class="direction-badge ${dc}"><i class="fa-solid ${di}"></i> ${dl}</span>
+                <div class="meta-sep"></div>
+                <div class="meta-item"><i class="fa-solid fa-location-dot" style="color:var(--accent2);"></i><strong>${safeStr(trip.landmark||'—')}</strong></div>
+                <div class="meta-sep"></div>
+                <div class="meta-item"><i class="fa-regular fa-clock"></i><strong>${safeStr(trip.shift_time||'N/A')}</strong></div>
+                <div class="meta-sep"></div>
+                <div class="meta-item"><i class="fa-regular fa-building"></i><strong>${safeStr(trip.office||'N/A')}</strong></div>
+            </div>
+            <div class="emp-row">
+                <span class="emp-name">${safeStr(trip.employee_name||'—')}</span>
+                <span class="emp-id">${safeStr(trip.employee_id||'—')}</span>
+                ${trip.gender?`<span class="emp-gender">${trip.gender}</span>`:''}
+            </div>
+            <div class="times-block">
+                <div class="times-block-header">
+                    <span><i class="fa-solid fa-route" style="color:var(--accent);margin-right:4px;"></i> Trip Times</span>
+                    <div>
+                        <button class="btn-micro btn-micro-edit" id="time-btn-edit-${tripId}" onclick="toggleTimeEdit('${tripId}','edit')"><i class="fa-regular fa-pen-to-square"></i> Edit</button>
+                        <button class="btn-micro btn-micro-save" id="time-btn-save-${tripId}" style="display:none;" onclick="toggleTimeEdit('${tripId}','save')">✓ Save</button>
+                        <button class="btn-micro btn-micro-cancel" id="time-btn-cancel-${tripId}" style="display:none;" onclick="toggleTimeEdit('${tripId}','cancel')">✕</button>
+                    </div>
+                </div>
+                <div class="times-row">
+                    <div class="time-block"><div class="time-dot pickup"></div><span class="time-label">Pickup</span><span class="time-value" id="pu-display-${tripId}">${safeStr(trip.pickup_time||'--:--')}</span></div>
+                    <i class="fa-solid fa-arrow-right times-arrow"></i>
+                    <div class="time-block"><div class="time-dot drop"></div><span class="time-label">Drop</span><span class="time-value" id="dr-display-${tripId}">${safeStr(trip.drop_time||'--:--')}</span></div>
+                </div>
+                <div class="time-edit-row" id="time-edit-row-${tripId}">
+                    <span class="time-edit-label" style="color:#3ddc84;">Pickup</span>
+                    <input type="time" class="time-edit-input" id="pu-input-${tripId}" step="60">
+                    <span class="time-edit-label" style="color:#ff6b6b;margin-left:8px;">Drop</span>
+                    <input type="time" class="time-edit-input" id="dr-input-${tripId}" step="60">
+                </div>
+            </div>
+            <div class="address-block">
+                <div class="address-landmark"><i class="fa-solid fa-location-dot"></i> ${safeStr(trip.landmark||'—')}</div>
+                <div class="address-text">${safeStr(trip.address||'—')}</div>
+            </div>
+            ${(trip.journey_start_location||trip.journey_end_location)?`
+            <div class="journey-row">
+                <span style="color:var(--green);font-weight:600;">${safeStr(trip.journey_start_location||'?')}</span>
+                <i class="fa-solid fa-arrow-right" style="color:var(--text-dim);font-size:0.62rem;"></i>
+                <span style="color:var(--accent2);font-weight:600;">${safeStr(trip.journey_end_location||'?')}</span>
+            </div>`:''}
+        </div>
+        <div class="toll-options">
+            <div class="tolls-header">
+                <div class="tolls-title">
+                    <i class="fa-solid fa-receipt" style="color:var(--purple);"></i>
+                    ${isUpdated?'Linked Tolls':'Matched Tolls'}
+                    <span class="tolls-count">${tolls.length}</span>
+                </div>
+                ${!isUpdated?`<span style="font-size:0.68rem;color:var(--text-dim);">${loadedGap||''}</span>`:''}
+            </div>
+            ${tollsHtml}
+            ${isUpdated?`
+            <div class="linked-total">
+                <i class="fa-solid fa-circle-check" style="color:var(--green);"></i>
+                <span class="linked-total-label">Total:</span>
+                <span class="linked-total-val">₹${totalAmt.toLocaleString('en-IN',{maximumFractionDigits:2})}</span>
+                ${trip.toll_name?`<span style="font-family:var(--font-mono);font-size:0.72rem;color:var(--purple);margin-left:auto;">${trip.toll_name}</span>`:''}
+            </div>`:`
+            <button class="btn-link" id="btn-link-${tripId}" onclick="saveTolls('${tripId}')">
+                <i class="fa-solid fa-link"></i> Link Selected Tolls
+            </button>`}
+        </div>
+    </div>`;
+    container.appendChild(card);
+}
+
+// ══════════════════════════════════════════════════════
+//  LOAD AVAILABLE DATES INTO FILTER
+// ══════════════════════════════════════════════════════
+async function loadAvailableDates() {
+    const listEl = document.getElementById('list-date');
+    listEl.innerHTML = '<div class="ms-no-results"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+    try {
+        const res = await fetch('/api/toll/available_dates');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const dates = await res.json();
+        msOptions.date = dates;
+        msRenderList('date', '');
+        if (!dates.length) {
+            listEl.innerHTML = '<div class="ms-no-results">No shift dates found.</div>';
+        }
+    } catch(e) {
+        listEl.innerHTML = `<div class="ms-no-results" style="color:var(--accent2);">Failed to load dates</div>`;
+        console.error('[TollAudit] Date load error:', e);
+    }
+}
+
+// ══════════════════════════════════════════════════════
+//  APPLY & LOAD (triggered by Load Data button)
+// ══════════════════════════════════════════════════════
+async function applyAndLoad() {
+    if (isLoading) return;
+    const dateSet = msState.date;
+    if (!dateSet.size) { alert('Please select a Shift Date first.'); return; }
+
+    const date    = [...dateSet][0];
+    const gapIdx  = parseInt(document.getElementById('gap-slider').value);
+    const gapHr   = gapHours(gapIdx);
+    const gapLbl  = gapLabel(gapIdx);
+
+    isLoading = true;
+    document.getElementById('btn-apply').disabled   = true;
+    document.getElementById('btn-apply').innerHTML  = '<i class="fa-solid fa-spinner fa-spin"></i> Loading…';
+    document.getElementById('btn-refresh').disabled = true;
+
+    // Reset secondary filter selections (options will repopulate after load)
+    ['direction','office','landmark','cab','toll','tripid'].forEach(k => {
+        msState[k].clear(); msUpdateLabel(k);
+    });
+
+    // Show loaders
+    document.getElementById('grid-pending').innerHTML =
+        `<div class="loader"><i class="fa-solid fa-spinner fa-spin"></i><span>Loading for ${formatDateLabel(date)} with gap ${gapLbl}…</span></div>`;
+    document.getElementById('grid-updated').innerHTML =
+        `<div class="loader"><i class="fa-solid fa-spinner fa-spin"></i><span>Loading…</span></div>`;
+
+    try {
+        const url = `/api/toll/potential_matches?shift_date=${encodeURIComponent(date)}&time_gap_hours=${gapHr}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        allMatches = await res.json();
+
+        loadedDate = date;
+        loadedGap  = gapLbl;
+
+        console.log(`[TollAudit] Loaded: date=${date}, gap=±${gapHr}h, records=${allMatches.length}`);
+
+        filteredMatches = [...allMatches];
+        populateSecondaryFilters(allMatches);
+        renderGrids(filteredMatches);
+        renderChips();
+
+        // Update stats bar
+        document.getElementById('stats-bar').style.display = 'flex';
+        document.getElementById('stat-date').textContent   = formatDateLabel(date);
+        document.getElementById('stat-gap').textContent    = gapLbl;
+
+    } catch(e) {
+        console.error('[TollAudit] Load error:', e);
+        const errHtml = `<div class="loader" style="color:var(--accent2);">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Error: ${e.message}</span>
+        </div>`;
+        document.getElementById('grid-pending').innerHTML = errHtml;
+        document.getElementById('grid-updated').innerHTML = errHtml;
+    } finally {
+        isLoading = false;
+        document.getElementById('btn-apply').disabled  = false;
+        document.getElementById('btn-apply').innerHTML = '<i class="fa-solid fa-bolt"></i> Load Data';
+        checkEnableLoad();
+    }
+}
+
+// ══════════════════════════════════════════════════════
+//  SAVE / LINK
+// ══════════════════════════════════════════════════════
+async function saveTolls(tripUniqueId) {
+    const checkboxes = document.querySelectorAll(`.toll-checkbox-${tripUniqueId}:checked`);
+    const selectedTollIds = Array.from(checkboxes).map(cb => cb.value);
+    if (!selectedTollIds.length) { alert('Select at least one toll to link!'); return; }
+
+    const btn = document.getElementById(`btn-link-${tripUniqueId}`);
+    if (btn) { btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Linking…'; }
+
+    try {
+        const res = await fetch('/api/toll/mark', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ trip_unique_id: tripUniqueId, selected_toll_ids: selectedTollIds })
+        });
+        if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.detail||'Server error'); }
+
+        const card = document.getElementById(`card-${tripUniqueId}`);
+        if (card) { card.style.transition='opacity 0.3s,transform 0.3s'; card.style.opacity='0'; card.style.transform='translateY(-4px)'; }
+        setTimeout(() => {
+            const m = allMatches.find(m => safeStr(m.trip.unique_id) === tripUniqueId);
+            if (m) m._linked = true;
+            const f = filteredMatches.find(m => safeStr(m.trip.unique_id) === tripUniqueId);
+            if (f) f._linked = true;
+            renderGrids(filteredMatches);
+        }, 300);
+    } catch(e) {
+        console.error('[TollAudit]', e);
+        alert('Failed: ' + e.message);
+        if (btn) { btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-link"></i> Link Selected Tolls'; }
+    }
+}
+
+// ══════════════════════════════════════════════════════
+//  BOOT — only load date list, nothing else
+// ══════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+    onGapChange(2);   // initialise gap display (index 2 = ±1h 40m → actually index 2 = 1h 40m)
+    // Correct: slider default is 2 → GAP_STEPS[2] = 1.667h = 1h 40m
+    // Actually let's default to index 2 = 1h40m; user can adjust
+    loadAvailableDates();
+});
+</script>
 </body>
 </html>

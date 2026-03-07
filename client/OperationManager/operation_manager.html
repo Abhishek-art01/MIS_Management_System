@@ -1,45 +1,649 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data Management Center</title>
-
-    <link rel="stylesheet" href="/operation-manager-static/operation_manager.css">
-
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="components-static/Sidebar.css">
-    <script src="components-static/Sidebar.js"></script> 
+    <style>
+        /* ═══════════════════════════════════════════════
+           TOKENS
+        ═══════════════════════════════════════════════ */
+        :root {
+            --bg:           #0a0c10;
+            --bg-card:      #0f1117;
+            --bg-raised:    #151820;
+            --bg-hover:     #1c2030;
+            --border:       #1e2535;
+            --border-light: #252d40;
+            --accent:       #2a7fff;
+            --accent-dim:   rgba(42,127,255,.12);
+            --accent-glow:  rgba(42,127,255,.25);
+            --danger:       #ff4d4d;
+            --danger-dim:   rgba(255,77,77,.10);
+            --success:      #22d47a;
+            --success-dim:  rgba(34,212,122,.10);
+            --warning:      #f5a623;
+            --text-1:       #e8eaf0;
+            --text-2:       #8892a4;
+            --text-3:       #4a5568;
+            --radius:       12px;
+            --radius-sm:    8px;
+            --shadow:       0 4px 24px rgba(0,0,0,.5);
+            --shadow-glow:  0 0 0 1px var(--accent), 0 4px 32px var(--accent-glow);
+        }
+
+        /* ═══════════════════════════════════════════════
+           RESET & BASE
+        ═══════════════════════════════════════════════ */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Syne', sans-serif;
+            background: var(--bg);
+            color: var(--text-1);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Subtle grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(var(--border) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 48px 48px;
+            opacity: .35;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ═══════════════════════════════════════════════
+           LAYOUT
+        ═══════════════════════════════════════════════ */
+        .main-container {
+            position: relative;
+            z-index: 1;
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 32px 24px 64px;
+        }
+
+        /* ═══════════════════════════════════════════════
+           HEADER
+        ═══════════════════════════════════════════════ */
+        .page-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 24px;
+            margin-bottom: 40px;
+            padding-bottom: 28px;
+            border-bottom: 1px solid var(--border);
+            animation: fadeDown .5s ease both;
+        }
+
+        .header-content h1 {
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: -.02em;
+            color: var(--text-1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-content h1 i {
+            color: var(--accent);
+            font-size: 1.4rem;
+        }
+
+        .header-content p {
+            margin-top: 6px;
+            font-size: .875rem;
+            color: var(--text-2);
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: .01em;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 18px;
+            background: var(--bg-raised);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            color: var(--text-2);
+            text-decoration: none;
+            font-size: .82rem;
+            font-weight: 500;
+            letter-spacing: .03em;
+            text-transform: uppercase;
+            transition: all .2s;
+            white-space: nowrap;
+        }
+
+        .back-btn:hover {
+            color: var(--text-1);
+            border-color: var(--accent);
+            background: var(--accent-dim);
+        }
+
+        /* ═══════════════════════════════════════════════
+           GRID
+        ═══════════════════════════════════════════════ */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ═══════════════════════════════════════════════
+           CARD
+        ═══════════════════════════════════════════════ */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            animation: fadeUp .5s ease both;
+            transition: border-color .25s;
+        }
+
+        .card:hover { border-color: var(--border-light); }
+        .upload-card { animation-delay: .1s; }
+        .download-card { animation-delay: .2s; }
+
+        /* Coloured top stripe */
+        .card::before {
+            content: '';
+            display: block;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
+        }
+
+        .download-card::before {
+            background: linear-gradient(90deg, var(--success) 0%, transparent 100%);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-header h2 {
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: -.01em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-1);
+        }
+
+        .card-header h2 i { color: var(--accent); font-size: .95rem; }
+        .download-card .card-header h2 i { color: var(--success); }
+
+        .badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .7rem;
+            font-weight: 500;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background: var(--accent-dim);
+            color: var(--accent);
+            border: 1px solid rgba(42,127,255,.2);
+        }
+
+        .badge.green {
+            background: var(--success-dim);
+            color: var(--success);
+            border-color: rgba(34,212,122,.2);
+        }
+
+        .card-body {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* ═══════════════════════════════════════════════
+           INSTRUCTION TEXT
+        ═══════════════════════════════════════════════ */
+        .instruction {
+            font-size: .85rem;
+            color: var(--text-2);
+            line-height: 1.6;
+        }
+
+        .instruction strong { color: var(--text-1); }
+
+        /* ═══════════════════════════════════════════════
+           DROP ZONE
+        ═══════════════════════════════════════════════ */
+        .drop-zone {
+            position: relative;
+            border: 1.5px dashed var(--border-light);
+            border-radius: var(--radius-sm);
+            padding: 28px 20px;
+            text-align: center;
+            background: var(--bg-raised);
+            cursor: pointer;
+            transition: all .2s;
+            overflow: hidden;
+        }
+
+        .drop-zone::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 0%, var(--accent-dim), transparent 70%);
+            opacity: 0;
+            transition: opacity .3s;
+            pointer-events: none;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            border-color: var(--accent);
+            background: var(--bg-hover);
+        }
+
+        .drop-zone:hover::after,
+        .drop-zone.dragover::after { opacity: 1; }
+
+        .drop-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .file-icon {
+            font-size: 2rem;
+            color: var(--accent);
+            margin-bottom: 10px;
+            display: block;
+            opacity: .7;
+        }
+
+        .drop-text {
+            font-size: .83rem;
+            color: var(--text-2);
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: .01em;
+            pointer-events: none;
+        }
+
+        /* ═══════════════════════════════════════════════
+           FORM GROUPS
+        ═══════════════════════════════════════════════ */
+        .upload-options,
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: .78rem;
+            font-weight: 600;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: var(--text-2);
+        }
+
+        .select-wrapper {
+            position: relative;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px 36px 10px 14px;
+            background: var(--bg-raised);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            color: var(--text-1);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .82rem;
+            appearance: none;
+            cursor: pointer;
+            transition: border-color .2s, box-shadow .2s;
+            outline: none;
+        }
+
+        select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-dim);
+        }
+
+        select option {
+            background: var(--bg-raised);
+            color: var(--text-1);
+        }
+
+        .arrow-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-3);
+            font-size: .7rem;
+            pointer-events: none;
+        }
+
+        /* ═══════════════════════════════════════════════
+           MODE TOGGLE
+        ═══════════════════════════════════════════════ */
+        .mode-toggle {
+            display: flex;
+            gap: 8px;
+        }
+
+        .mode-toggle input[type="radio"] { display: none; }
+
+        .mode-toggle label {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: .8rem;
+            font-weight: 600;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            color: var(--text-2);
+            background: var(--bg-raised);
+            transition: all .2s;
+        }
+
+        .mode-toggle label:hover { color: var(--text-1); background: var(--bg-hover); }
+
+        #modeAppend:checked + label {
+            border-color: var(--accent);
+            background: var(--accent-dim);
+            color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent-dim);
+        }
+
+        #modeErase:checked + label {
+            border-color: var(--danger);
+            background: var(--danger-dim);
+            color: var(--danger);
+            box-shadow: 0 0 0 1px var(--danger-dim);
+        }
+
+        .mode-hint {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .72rem;
+            color: var(--text-3);
+            line-height: 1.5;
+            padding: 8px 12px;
+            background: var(--bg-raised);
+            border-radius: var(--radius-sm);
+            border-left: 2px solid var(--border-light);
+            transition: border-color .2s;
+        }
+
+        .mode-hint.is-danger { border-left-color: var(--danger); color: #ff8080; }
+        .mode-hint.is-safe   { border-left-color: var(--accent);  color: #7ab8ff; }
+
+        /* ═══════════════════════════════════════════════
+           BUTTONS
+        ═══════════════════════════════════════════════ */
+        .actions { display: flex; }
+
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            width: 100%;
+            padding: 12px 20px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: 'Syne', sans-serif;
+            font-size: .85rem;
+            font-weight: 700;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all .2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .action-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,.06);
+            opacity: 0;
+            transition: opacity .2s;
+        }
+
+        .action-btn:hover::after { opacity: 1; }
+
+        .upload-btn {
+            background: var(--accent);
+            color: #fff;
+            box-shadow: 0 2px 16px var(--accent-glow);
+        }
+
+        .upload-btn:hover {
+            background: #3d8fff;
+            box-shadow: 0 4px 24px var(--accent-glow);
+            transform: translateY(-1px);
+        }
+
+        .upload-btn:active { transform: translateY(0); }
+
+        .upload-btn:disabled {
+            background: var(--bg-raised);
+            color: var(--text-3);
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .download-btn {
+            background: transparent;
+            border: 1px solid var(--success);
+            color: var(--success);
+            box-shadow: 0 0 16px rgba(34,212,122,.08);
+        }
+
+        .download-btn:hover {
+            background: var(--success-dim);
+            box-shadow: 0 0 24px rgba(34,212,122,.15);
+            transform: translateY(-1px);
+        }
+
+        .download-btn:disabled {
+            border-color: var(--border-light);
+            color: var(--text-3);
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ═══════════════════════════════════════════════
+           STATUS AREA
+        ═══════════════════════════════════════════════ */
+        .status-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg-raised);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .78rem;
+            color: var(--text-2);
+            animation: fadeIn .3s ease;
+        }
+
+        .loader {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-light);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            flex-shrink: 0;
+        }
+
+        .success-msg { color: var(--success); }
+        .error-msg   { color: var(--danger);  }
+
+        /* ═══════════════════════════════════════════════
+           INFO BOX
+        ═══════════════════════════════════════════════ */
+        .info-box {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 14px;
+            background: var(--bg-raised);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .75rem;
+            color: var(--text-2);
+            line-height: 1.5;
+        }
+
+        .info-box i {
+            color: var(--success);
+            margin-top: 1px;
+            flex-shrink: 0;
+        }
+
+        /* Load error */
+        #tableLoadStatus, #uploadTableLoadStatus {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* ═══════════════════════════════════════════════
+           ANIMATIONS
+        ═══════════════════════════════════════════════ */
+        @keyframes fadeDown {
+            from { opacity: 0; transform: translateY(-16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ═══════════════════════════════════════════════
+           SCROLLBAR
+        ═══════════════════════════════════════════════ */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+    </style>
 </head>
 
 <body>
-
     <div class="main-container">
 
+        <!-- ── HEADER ───────────────────────────────── -->
         <header class="page-header">
             <div class="header-content">
                 <h1><i class="fa-solid fa-server"></i> Data Management Center</h1>
-                <p>Central hub for uploading source files and downloading standardized database reports.</p>
+                <p>// Central hub for uploading source files and downloading standardized database reports.</p>
             </div>
             <a href="/" class="back-btn"><i class="fa-solid fa-house"></i> Dashboard</a>
         </header>
 
         <div class="dashboard-grid">
 
+            <!-- ══════════════════════════════════════
+                 UPLOAD CARD
+            ══════════════════════════════════════ -->
             <div class="card upload-card">
                 <div class="card-header">
                     <h2><i class="fa-solid fa-cloud-arrow-up"></i> Upload Data</h2>
                     <span class="badge">Operation</span>
                 </div>
                 <div class="card-body">
-                    <p class="instruction">Select a raw <strong>Operation .xls</strong> file to clean and import.</p>
+                    <p class="instruction">Select a raw <strong>.xls / .xlsx</strong> file to clean and import into the database.</p>
 
                     <div class="drop-zone" id="dropZone">
                         <i class="fa-solid fa-file-excel file-icon"></i>
                         <input type="file" id="opUploadInput" accept=".xls,.xlsx">
-                        <p class="drop-text" id="fileLabel">Click to browse file</p>
+                        <p class="drop-text" id="fileLabel">Click to browse or drag & drop</p>
+                    </div>
+
+                    <div class="upload-options">
+
+                        <!-- Target Table -->
+                        <div class="form-group">
+                            <label for="uploadTableSelect">Target Table</label>
+                            <div class="select-wrapper">
+                                <select id="uploadTableSelect">
+                                    <option value="" disabled selected>Loading tables...</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down arrow-icon"></i>
+                            </div>
+                            <div id="uploadTableLoadStatus" style="margin-top:4px; font-size:.8rem; display:none;">
+                                <span id="uploadTableLoadText"></span>
+                            </div>
+                        </div>
+
+                        <!-- Mode Toggle -->
+                        <div class="form-group">
+                            <label>Import Mode</label>
+                            <div class="mode-toggle">
+                                <input type="radio" name="uploadMode" id="modeAppend" value="append" checked>
+                                <label for="modeAppend">
+                                    <i class="fa-solid fa-layer-group"></i> Append Unique
+                                </label>
+                                <input type="radio" name="uploadMode" id="modeErase" value="erase">
+                                <label for="modeErase">
+                                    <i class="fa-solid fa-trash"></i> Erase & Replace
+                                </label>
+                            </div>
+                            <p class="mode-hint is-safe" id="modeHint">
+                                Skips rows that already exist in the table.
+                            </p>
+                        </div>
+
                     </div>
 
                     <div class="actions">
@@ -55,6 +659,9 @@
                 </div>
             </div>
 
+            <!-- ══════════════════════════════════════
+                 DOWNLOAD CARD
+            ══════════════════════════════════════ -->
             <div class="card download-card">
                 <div class="card-header">
                     <h2><i class="fa-solid fa-cloud-arrow-down"></i> Download Reports</h2>
@@ -64,28 +671,27 @@
                     <p class="instruction">Select a database table to export as a formatted Excel file.</p>
 
                     <div class="form-group">
-                        <label for="tableSelect">Select Table Source:</label>
+                        <label for="tableSelect">Table Source</label>
                         <div class="select-wrapper">
                             <select id="tableSelect">
-                                <option value="operation">📂 Operation Data (Cleaned)</option>
-                                <option value="client">👥 Client Data (Cleaned)</option>
-                                <option value="raw">🚙 Raw Trip Data (Cleaned)</option>
-                                <option value="trip_data">📍 Master Trip Data (GPS)</option>
-                                <option value="toll">💰 Toll Data </option>
+                                <option value="" disabled selected>Loading tables...</option>
                             </select>
                             <i class="fa-solid fa-chevron-down arrow-icon"></i>
+                        </div>
+                        <div id="tableLoadStatus" style="margin-top:4px; font-size:.8rem; display:none;">
+                            <span id="tableLoadText"></span>
                         </div>
                     </div>
 
                     <div class="actions">
-                        <button onclick="downloadSelectedTable()" class="action-btn download-btn">
+                        <button onclick="downloadSelectedTable()" id="downloadBtn" class="action-btn download-btn" disabled>
                             <i class="fa-solid fa-file-export"></i> Download Selected Table
                         </button>
                     </div>
 
                     <div class="info-box">
                         <i class="fa-solid fa-circle-info"></i>
-                        <span>Files are generated in real-time from the SQL Database.</span>
+                        <span>Files are generated in real-time from the SQL Database. Large tables may take a moment to export.</span>
                     </div>
                 </div>
             </div>
@@ -94,70 +700,134 @@
     </div>
 
     <script>
-        // 1. File Input Visuals
+        /* ── Config ──────────────────────────────────────── */
+        const TABLE_ICONS = {
+            operation : "📂", client : "👥", raw : "🚙",
+            trip_data : "📍", toll   : "💰"
+        };
+        const EXCLUDED_TABLES = ["user", "users", "alembic_version"];
+        const MODE_HINTS = {
+            append: { text: "Skips rows that already exist in the table.",      cls: "is-safe"   },
+            erase:  { text: "Deletes ALL existing data before inserting. This cannot be undone.", cls: "is-danger" }
+        };
+
+        /* ── Mode toggle hint ────────────────────────────── */
+        document.querySelectorAll('input[name="uploadMode"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const hint = document.getElementById('modeHint');
+                const m = MODE_HINTS[radio.value];
+                hint.textContent = m.text;
+                hint.className = `mode-hint ${m.cls}`;
+            });
+        });
+
+        /* ── Drag & drop visuals ─────────────────────────── */
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop',      e => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+
+        /* ── Shared: fetch tables → populate <select> ────── */
+        async function loadTables(selectId, statusWrapId, statusTextId, btnId = null) {
+            const select     = document.getElementById(selectId);
+            const statusWrap = document.getElementById(statusWrapId);
+            const statusText = document.getElementById(statusTextId);
+            const btn        = btnId ? document.getElementById(btnId) : null;
+
+            try {
+                const res = await fetch('/api/tables');
+                if (!res.ok) throw new Error(`Server returned ${res.status}`);
+                const data   = await res.json();
+                const tables = Array.isArray(data) ? data : data.tables;
+                if (!tables?.length) throw new Error("No tables returned.");
+
+                const filtered = tables.filter(t => !EXCLUDED_TABLES.includes(t.toLowerCase()));
+                select.innerHTML = "";
+                filtered.forEach(table => {
+                    const icon  = TABLE_ICONS[table] ?? "🗄️";
+                    const label = table.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    const opt   = document.createElement('option');
+                    opt.value = table;
+                    opt.textContent = `${icon}  ${label}`;
+                    select.appendChild(opt);
+                });
+                if (btn) btn.disabled = false;
+
+            } catch (err) {
+                select.innerHTML = '<option value="" disabled selected>Failed to load tables</option>';
+                statusWrap.style.display = "block";
+                statusText.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:var(--danger)"></i>
+                    <span style="color:var(--danger); margin-left:6px">${err.message}</span>`;
+            }
+        }
+
+        /* ── File input visuals ──────────────────────────── */
         const fileInput = document.getElementById('opUploadInput');
         const fileLabel = document.getElementById('fileLabel');
 
         fileInput.addEventListener('change', function () {
             if (this.files[0]) {
-                fileLabel.innerHTML = `<strong>Selected:</strong> ${this.files[0].name}`;
-                fileLabel.style.color = "#0070C0";
+                fileLabel.innerHTML = `<strong style="color:var(--text-1)">${this.files[0].name}</strong>`;
+                fileLabel.style.color = "var(--accent)";
             }
         });
 
-        // 2. Upload Logic
+        /* ── Upload ──────────────────────────────────────── */
         async function uploadOperationData() {
-            if (fileInput.files.length === 0) {
-                alert("Please select a file first.");
-                return;
+            if (!fileInput.files.length) { alert("Please select a file first."); return; }
+            const targetTable = document.getElementById('uploadTableSelect').value;
+            if (!targetTable) { alert("Please select a target table."); return; }
+            const uploadMode = document.querySelector('input[name="uploadMode"]:checked').value;
+
+            if (uploadMode === "erase") {
+                if (!confirm(`⚠️ This will DELETE all existing data in "${targetTable}" before inserting.\n\nAre you sure?`)) return;
             }
 
-            const btn = document.getElementById('uploadBtn');
+            const btn        = document.getElementById('uploadBtn');
             const statusArea = document.getElementById('statusArea');
             const statusText = document.getElementById('statusText');
 
-            // UI Loading State
-            btn.disabled = true;
+            btn.disabled  = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
             statusArea.style.display = "flex";
-            statusText.textContent = "Cleaning data and updating database...";
-            statusText.className = "";
+            statusText.textContent   = "Cleaning data and updating database...";
+            statusText.className     = "";
 
             const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+            formData.append('file',  fileInput.files[0]);
+            formData.append('table', targetTable);
+            formData.append('mode',  uploadMode);
 
             try {
-                const response = await fetch('/api/operation/upload', {
-                    method: 'POST',
-                    body: formData
-                });
+                const res    = await fetch('/api/upload', { method: 'POST', body: formData });
+                const result = await res.json();
 
-                const result = await response.json();
-
-                if (response.ok && result.status === 'success') {
-                    statusText.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${result.message}`;
+                if (res.ok && result.status === 'success') {
+                    statusText.innerHTML = `<i class="fa-solid fa-check-circle" style="color:var(--success)"></i>&nbsp; ${result.message}`;
                     statusText.className = "success-msg";
+                    loadTables('tableSelect', 'tableLoadStatus', 'tableLoadText', 'downloadBtn');
                 } else {
                     throw new Error(result.message || "Unknown error occurred");
                 }
             } catch (error) {
-                console.error('Upload Error:', error);
-                statusText.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Error: ${error.message}`;
+                statusText.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:var(--danger)"></i>&nbsp; Error: ${error.message}`;
                 statusText.className = "error-msg";
             } finally {
-                btn.disabled = false;
+                btn.disabled  = false;
                 btn.innerHTML = '<i class="fa-solid fa-upload"></i> Process & Save to DB';
             }
         }
 
-        // 3. Download Logic
+        /* ── Download ────────────────────────────────────── */
         function downloadSelectedTable() {
             const tableType = document.getElementById('tableSelect').value;
-            // Trigger download in new tab
-            const url = `/api/${tableType}/download`;
-            window.open(url, '_blank');
+            if (!tableType) { alert("Please select a table first."); return; }
+            window.open(`/api/${tableType}/download`, '_blank');
         }
+
+        /* ── Init ────────────────────────────────────────── */
+        loadTables('tableSelect',       'tableLoadStatus',       'tableLoadText',       'downloadBtn');
+        loadTables('uploadTableSelect', 'uploadTableLoadStatus', 'uploadTableLoadText');
     </script>
 </body>
-
 </html>
