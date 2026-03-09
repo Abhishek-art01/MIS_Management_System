@@ -261,4 +261,20 @@ class TableSchemaResponse(BaseModel):
     table_name: str
     columns: List[Dict[str, Any]]
     row_count: Optional[int] = None
-    
+
+class TollRouteRule(DynamicSQLModel, table=True):
+    __tablename__ = "toll_route_rules"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    landmark:  Optional[str] = Field(default=None, index=True)
+    office:    Optional[str] = Field(default=None, index=True)
+
+    # toll_name = transaction_description from TollData (normalised UPPER)
+    toll_name: Optional[str] = Field(default=None, index=True)
+
+    # True  = confirmed toll route
+    # False = NOT a toll route (hidden on load)
+    is_toll_route: bool = Field(default=True)
+
+    created_at: Optional[str] = Field(default=None)
