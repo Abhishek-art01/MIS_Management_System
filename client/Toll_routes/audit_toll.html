@@ -477,6 +477,51 @@ function precomputeTimes(matches){
 }
 
 // ══════════════════════════════════════════════════════
+//  DEDUPLICATE TOLLS BY NAME — per card
+//  If multiple tolls share the same name (transaction_description),
+//  keep only the one closest in time to the trip's shift time.
+// ══════════════════════════════════════════════════════
+function deduplicateTollsByName(matches){
+    for(const m of matches){
+        const refMs = m._refMs;
+        // Group tolls by normalised name
+        const groups = new Map(); // normName → [toll, ...]
+        for(const t of m.tolls){
+            const name = safeStr(t.transaction_description||t.toll_name||'').trim().toUpperCase();
+            if(!name){ // no name → always keep
+                if(!groups.has('__noname__')) groups.set('__noname__', []);
+                groups.get('__noname__').push(t);
+                continue;
+            }
+            if(!groups.has(name)) groups.set(name, []);
+            groups.get(name).push(t);
+        }
+        const kept = [];
+        for(const [name, tolls] of groups){
+            if(name === '__noname__' || tolls.length === 1){
+                kept.push(...tolls);
+                continue;
+            }
+            // Multiple tolls with same name — keep nearest to refMs
+            if(refMs === null){
+                // Can't compute — keep first one only
+                kept.push(tolls[0]);
+                continue;
+            }
+            let best = tolls[0];
+            let bestDiff = best._tollMs !== null ? Math.abs(best._tollMs - refMs) : Infinity;
+            for(let i=1; i<tolls.length; i++){
+                const diff = tolls[i]._tollMs !== null ? Math.abs(tolls[i]._tollMs - refMs) : Infinity;
+                if(diff < bestDiff){ bestDiff = diff; best = tolls[i]; }
+            }
+            kept.push(best);
+        }
+        // Preserve original order
+        m.tolls = m.tolls.filter(t => kept.includes(t));
+    }
+}
+
+// ══════════════════════════════════════════════════════
 //  HELPERS
 // ══════════════════════════════════════════════════════
 function safeStr(v){ return (v===null||v===undefined)?'':String(v); }
@@ -1070,6 +1115,7 @@ async function applyAndLoad(){
         const raw=results.flat();
         allMatches=deduplicateByTripId(raw);
         precomputeTimes(allMatches);   // cache ref times + toll times for gap filter
+        deduplicateTollsByName(allMatches); // keep only nearest toll per unique name
         tollMatchCounts=buildTollMatchCounts(allMatches);
         loadedDates=dates;loadedGap=gapLbl;
         filteredMatches=[...allMatches];
