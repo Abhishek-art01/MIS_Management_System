@@ -688,6 +688,10 @@
                             <i class="fa-solid fa-file-export"></i> Download Selected Table
                         </button>
                     </div>
+                    <div id="downloadStatusArea" class="status-area" style="display: none;">
+                        <div class="loader"></div>
+                        <span id="downloadStatusText"></span>
+                    </div>
 
                     <div class="info-box">
                         <i class="fa-solid fa-circle-info"></i>
@@ -819,10 +823,55 @@
         }
 
         /* ── Download ────────────────────────────────────── */
-        function downloadSelectedTable() {
+        async function downloadSelectedTable() {
             const tableType = document.getElementById('tableSelect').value;
             if (!tableType) { alert("Please select a table first."); return; }
-            window.open(`/api/${tableType}/download`, '_blank');
+
+            const btn        = document.getElementById('downloadBtn');
+            const statusArea = document.getElementById('downloadStatusArea');
+            const statusText = document.getElementById('downloadStatusText');
+
+            btn.disabled  = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+            statusArea.style.display = "flex";
+            statusText.textContent   = "Querying database and building Excel file…";
+            statusText.className     = "";
+
+            try {
+                const res = await fetch(`/api/${tableType}/download`);
+
+                // Server returned an error — parse JSON and show message
+                if (!res.ok || res.headers.get('content-type')?.includes('application/json')) {
+                    const err = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
+                    throw new Error(err.message || `Server error ${res.status}`);
+                }
+
+                // Success — pull filename from Content-Disposition header if present
+                const disposition = res.headers.get('content-disposition') || '';
+                const match       = disposition.match(/filename="?([^";\n]+)"?/i);
+                const filename    = match ? match[1] : `${tableType}_export.xlsx`;
+
+                // Convert to blob and trigger browser download
+                const blob = await res.blob();
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                a.href     = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+
+                statusText.innerHTML = `<i class="fa-solid fa-check-circle" style="color:var(--success)"></i>&nbsp; Downloaded: ${filename}`;
+                statusText.className = "success-msg";
+
+            } catch (err) {
+                statusText.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:var(--danger)"></i>&nbsp; ${err.message}`;
+                statusText.className = "error-msg";
+            } finally {
+                btn.disabled  = false;
+                btn.innerHTML = '<i class="fa-solid fa-file-export"></i> Download Selected Table';
+            }
         }
 
         /* ── Init ────────────────────────────────────────── */
