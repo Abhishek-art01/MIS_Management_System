@@ -41,13 +41,13 @@ async def download_file(filename: str, request: Request):
 def download_specific_table(table_type: str, session: Session = Depends(get_session)):
     # Map the URL parameter to the correct Database Model
     model_map = {
-        "operation": OperationData,
-        "client": ClientData,
-        "raw": RawTripData,
-        "trip_data": TripData,
-        "toll": TollData  # Added TollData!
+        "operation":  OperationData,
+        "client":     ClientData,
+        "raw":        RawTripData,
+        "trip_data":  TripData,   # keep old key
+        "tripdata":   TripData,   # ← ADD THIS — actual SQL table name
+        "toll":       TollData,
     }
-    
     if table_type not in model_map:
         return {"status": "error", "message": "Invalid table type selected."}
     
