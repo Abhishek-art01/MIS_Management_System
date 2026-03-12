@@ -195,7 +195,7 @@
         */
         .toll-item{
             display:grid;
-            grid-template-columns:auto 1fr auto;
+            grid-template-columns:1fr auto;
             gap:8px;
             align-items:center;
             background:var(--bg);padding:9px 11px;
@@ -206,8 +206,7 @@
         .toll-item.selected{border-color:var(--green);background:rgba(61,220,132,.05);}
         .toll-item.is-confirmed-route{border-color:rgba(61,220,132,.35);background:rgba(61,220,132,.03);}
 
-        /* Left section: no-link button */
-        .toll-left{display:flex;align-items:center;}
+        
 
         /* Middle section: checkbox + details + amount */
         .toll-middle{display:flex;align-items:flex-start;gap:9px;cursor:pointer;min-width:0;}
@@ -236,16 +235,6 @@
 
         /* Right section: Not-Route button */
         .toll-right{display:flex;align-items:center;}
-
-        /* NO LINK button — left, dismisses from this card only */
-        .btn-no-link{
-            padding:5px 7px;border:1px solid rgba(100,120,160,.3);border-radius:5px;
-            cursor:pointer;font-size:.65rem;font-weight:700;font-family:var(--font-mono);
-            background:rgba(100,120,160,.08);color:var(--text-dim);
-            white-space:nowrap;display:flex;align-items:center;gap:3px;
-            transition:all .15s;flex-shrink:0;
-        }
-        .btn-no-link:hover{background:rgba(255,107,107,.1);border-color:rgba(255,107,107,.4);color:var(--accent2);transform:translateY(-1px);}
 
         /* NOT ROUTE button — right, saves DB rule */
         .btn-not-route{
@@ -392,7 +381,7 @@
             <div class="landing-steps">
                 <div class="landing-step"><span class="landing-step-num">1</span> Pick <strong>Shift Dates</strong></div>
                 <div class="landing-step"><span class="landing-step-num">2</span> Choose gap direction <strong>+ / −</strong>, then magnitude with <strong>− / +</strong> buttons</div>
-                <div class="landing-step"><span class="landing-step-num">3</span> <strong>No Link</strong> (left) = skip toll for this card &nbsp;|&nbsp; <strong>Not Route</strong> (right) = save DB rule</div>
+                <div class="landing-step"><span class="landing-step-num">3</span> <strong>Not Route</strong> = save DB rule &nbsp;|&nbsp; <strong>Link Selected Tolls</strong> = link & auto-save route rules</div>
             </div>
         </div>
     </div>
@@ -833,14 +822,6 @@ function renderCard(data, container, isUpdated){
         const officeEsc  =office.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 
         return `<div class="toll-item ${isConfirmedRoute?'is-confirmed-route':''}" id="toll-item-${tId}">
-            <!-- LEFT: No Link (dismiss from this card, no DB rule) -->
-            <div class="toll-left">
-                <button class="btn-no-link" title="Skip — don't link this toll to this trip"
-                    onclick="noLinkToll('${tId}','${tripUniqueId}')">
-                    <i class="fa-solid fa-ban"></i><br>No<br>Link
-                </button>
-            </div>
-
             <!-- MIDDLE: checkbox + details + amount (clickable) -->
             <div class="toll-middle" onclick="toggleTollSelect(this)">
                 <input type="checkbox" class="toll-checkbox-${tripUniqueId}" value="${tId}" ${isConfirmedRoute?'checked':''}>
@@ -959,27 +940,7 @@ function renderCard(data, container, isUpdated){
     container.appendChild(card);
 }
 
-// ══════════════════════════════════════════════════════
-//  NO LINK — dismiss toll from this card only, no DB write
-// ══════════════════════════════════════════════════════
-function noLinkToll(tollId, tripUniqueId){
-    const itemEl=document.getElementById(`toll-item-${tollId}`);
-    if(itemEl){
-        itemEl.style.transition='opacity .2s,transform .2s';
-        itemEl.style.opacity='0';itemEl.style.transform='translateX(-12px)';
-        setTimeout(()=>{
-            itemEl.remove();
-            // Update count badge — card itself STAYS no matter how many are removed
-            const remaining=document.querySelectorAll(`.toll-checkbox-${tripUniqueId}`).length;
-            const countBadge=document.getElementById(`tolls-count-${tripUniqueId}`);
-            if(countBadge) countBadge.textContent=remaining;
-            updateStats(filteredMatches);
-        },200);
-    }
-    // Remove from memory
-    const m=allMatches.find(m=>safeStr(m.trip.unique_id)===tripUniqueId);
-    if(m) m.tolls=m.tolls.filter(t=>safeStr(t.id)!==tollId);
-}
+
 
 // ══════════════════════════════════════════════════════
 //  NOT TOLL ROUTE — saves DB rule
@@ -990,7 +951,20 @@ async function markNotTollRoute(tollId, tripUniqueId, tollDesc, landmark, office
     try{
         const res=await fetch('/api/toll/route_rule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({landmark,office,toll_name:tollDesc,is_toll_route:false})});
         if(!res.ok) throw new Error('HTTP '+res.status);
-        noLinkToll(tollId, tripUniqueId);
+        const itemEl=document.getElementById(`toll-item-${tollId}`);
+        if(itemEl){
+            itemEl.style.transition='opacity .2s,transform .2s';
+            itemEl.style.opacity='0';itemEl.style.transform='translateX(12px)';
+            setTimeout(()=>{
+                itemEl.remove();
+                const remaining=document.querySelectorAll(`.toll-checkbox-${tripUniqueId}`).length;
+                const countBadge=document.getElementById(`tolls-count-${tripUniqueId}`);
+                if(countBadge) countBadge.textContent=remaining;
+                updateStats(filteredMatches);
+            },200);
+        }
+        const m=allMatches.find(m=>safeStr(m.trip.unique_id)===tripUniqueId);
+        if(m) m.tolls=m.tolls.filter(t=>safeStr(t.id)!==tollId);
     } catch(e){
         alert('Failed to save rule: '+e.message);
         if(btn){btn.innerHTML='<i class="fa-solid fa-xmark"></i><br>Not<br>Route';btn.disabled=false;}
