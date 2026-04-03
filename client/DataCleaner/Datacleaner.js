@@ -15,6 +15,9 @@
   const btnSpinner = document.getElementById("btn-spinner");
   const resultArea = document.getElementById("result-area");
   const countBadge = document.getElementById("file-count-badge");
+  const dropTitle  = document.getElementById("drop-title");
+  const dropSub    = document.getElementById("drop-sub");
+  const dropIcon   = document.getElementById("drop-icon");
 
   let files = [];
 
@@ -29,28 +32,59 @@
     return document.querySelector('input[name="cleanerType"]:checked')?.value ?? "client";
   }
 
+  function isFastag() {
+    return getType() === "fastag";
+  }
+
   function setLoading(on) {
     processBtn.disabled = on;
-    btnLabel.style.display  = on ? "none"   : "inline";
-    btnSpinner.style.display = on ? "inline-block" : "none";
+    btnLabel.style.display   = on ? "none"         : "inline";
+    btnSpinner.style.display = on ? "inline-block"  : "none";
   }
+
+  // ── Drop zone UI — sync to selected cleaner type ──────────────────────────
+  function updateDropZoneUI() {
+    if (isFastag()) {
+      fileInput.accept  = ".pdf";
+      fileInput.multiple = true;
+      dropTitle.textContent = "Drop PDF files here";
+      dropSub.innerHTML = `or <span class="drop-link">browse to upload</span> &nbsp;·&nbsp; .pdf supported`;
+      dropIcon.textContent  = "◈";
+    } else {
+      fileInput.accept   = ".xlsx,.xls";
+      fileInput.multiple = true;
+      dropTitle.textContent = "Drop Excel files here";
+      dropSub.innerHTML = `or <span class="drop-link">browse to upload</span> &nbsp;·&nbsp; .xlsx, .xls supported`;
+      dropIcon.textContent  = "↑";
+    }
+  }
+
+  // ── Cleaner type change — clear queue + refresh UI ────────────────────────
+  document.querySelectorAll('input[name="cleanerType"]').forEach(radio => {
+    radio.addEventListener("change", () => {
+      files = [];
+      renderFiles();
+      resultArea.innerHTML = "";
+      updateDropZoneUI();
+    });
+  });
 
   // ── Render file list ──────────────────────────────────────────────────────
   function renderFiles() {
     if (files.length === 0) {
-      fileList.style.display  = "none";
-      actionRow.style.display = "none";
+      fileList.style.display   = "none";
+      actionRow.style.display  = "none";
       countBadge.style.display = "none";
       return;
     }
-    fileList.style.display  = "flex";
-    actionRow.style.display = "flex";
+    fileList.style.display   = "flex";
+    actionRow.style.display  = "flex";
     countBadge.style.display = "inline-flex";
     countBadge.textContent   = files.length + (files.length === 1 ? " file" : " files");
 
     fileList.innerHTML = files.map((f, i) => `
       <div class="file-item">
-        <span class="file-item-icon">◈</span>
+        <span class="file-item-icon">${f.name.match(/\.pdf$/i) ? "◈" : "◈"}</span>
         <span class="file-item-name" title="${f.name}">${f.name}</span>
         <span class="file-item-size">${fmtSize(f.size)}</span>
         <button class="file-item-remove" data-index="${i}" title="Remove">✕</button>
@@ -67,10 +101,24 @@
 
   // ── Add files ─────────────────────────────────────────────────────────────
   function addFiles(incoming) {
-    const allowed = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                     "application/vnd.ms-excel"];
+    const excelMimes = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+    ];
+    const pdfMime = "application/pdf";
+
     for (const f of incoming) {
-      if (!allowed.includes(f.type) && !f.name.match(/\.xlsx?$/i)) continue;
+      const isExcel = excelMimes.includes(f.type) || f.name.match(/\.xlsx?$/i);
+      const isPdf   = f.type === pdfMime          || f.name.match(/\.pdf$/i);
+
+      // Gate by cleaner type — silently skip wrong file types
+      if (isFastag()) {
+        if (!isPdf) continue;
+      } else {
+        if (!isExcel) continue;
+      }
+
+      // Deduplicate by name + size
       if (files.some(x => x.name === f.name && x.size === f.size)) continue;
       files.push(f);
     }
@@ -81,7 +129,7 @@
   // ── Drop zone events ──────────────────────────────────────────────────────
   dropZone.addEventListener("click",    () => fileInput.click());
   dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
-  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+  dropZone.addEventListener("dragleave", ()  => dropZone.classList.remove("drag-over"));
   dropZone.addEventListener("drop", e => {
     e.preventDefault();
     dropZone.classList.remove("drag-over");
@@ -109,7 +157,6 @@
         <p style="margin-top:14px; font-size:.875rem; color:var(--text-muted);">Processing files…</p>
       </div>`;
 
-    // Animate progress bar
     const pbar = document.getElementById("pbar");
     let prog = 0;
     const tick = setInterval(() => {
@@ -122,7 +169,7 @@
       files.forEach(f => fd.append("files", f));
       fd.append("cleanerType", getType());
 
-      const res  = await fetch("/clean-data", { method: "POST", body: fd });
+      const res = await fetch("/clean-data", { method: "POST", body: fd });
       clearInterval(tick);
       pbar.style.width = "100%";
 
@@ -132,14 +179,12 @@
         return;
       }
 
-      // Detect if response is a file download or JSON
       const ct = res.headers.get("content-type") ?? "";
 
       if (ct.includes("json")) {
         const data = await res.json();
         showSuccess(data);
       } else {
-        // File download
         const blob  = await res.blob();
         const fname = getFilename(res) || "output.xlsx";
         showDownload(blob, fname);
@@ -176,10 +221,10 @@
           <span class="badge badge-green">✓ Success</span>
         </div>
         <div class="result-stats">
-          ${statBlock("Rows Processed", data.rows_processed ?? data.total ?? "—")}
-          ${statBlock("Rows Saved",     data.rows_saved    ?? data.new_records ?? "—")}
-          ${statBlock("Addresses Synced", data.new_addresses ?? "—")}
-          ${statBlock("Source",         escHtml(data.source ?? data.cleanerType ?? "—"))}
+          ${statBlock("Rows Processed",   data.rows_processed ?? data.total       ?? "—")}
+          ${statBlock("Rows Saved",       data.rows_saved     ?? data.new_records ?? "—")}
+          ${statBlock("Addresses Synced", data.new_addresses  ?? "—")}
+          ${statBlock("Source",           escHtml(data.source ?? data.cleanerType ?? "—"))}
         </div>
         <div class="result-download">
           <span class="badge badge-gray">No download file generated</span>
@@ -188,7 +233,7 @@
   }
 
   function showDownload(blob, fname) {
-    const url = URL.createObjectURL(blob);
+    const url    = URL.createObjectURL(blob);
     const sizeKB = (blob.size / 1024).toFixed(1);
     resultArea.innerHTML = `
       <div class="result-card">
@@ -207,7 +252,6 @@
         </div>
       </div>`;
 
-    // Auto-click after short delay
     setTimeout(() => document.getElementById("dl-btn")?.click(), 400);
   }
 
@@ -221,8 +265,11 @@
 
   function escHtml(str) {
     return String(str)
-      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
-      .replace(/"/g,"&quot;");
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  updateDropZoneUI();
 
 })();
