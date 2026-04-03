@@ -214,6 +214,17 @@
   }
 
   function showSuccess(data) {
+    // Check if the backend sent a file_url. If so, create a download button using your existing download API.
+    const downloadSection = data.file_url
+      ? `<div>
+           <div class="type-name">${escHtml(data.file_url)}</div>
+           <div class="type-desc">Excel file ready</div>
+         </div>
+         <a href="/download/${escHtml(data.file_url)}" download="${escHtml(data.file_url)}" class="btn btn-primary btn-sm">
+           ↓ Download File
+         </a>`
+      : `<span class="badge badge-gray">No download file generated</span>`;
+
     resultArea.innerHTML = `
       <div class="result-card">
         <div class="result-header">
@@ -222,12 +233,12 @@
         </div>
         <div class="result-stats">
           ${statBlock("Rows Processed",   data.rows_processed ?? data.total       ?? "—")}
-          ${statBlock("Rows Saved",       data.rows_saved     ?? data.new_records ?? "—")}
+          ${statBlock("Rows Saved",       data.db_rows_added  ?? data.rows_saved  ?? "—")}
           ${statBlock("Addresses Synced", data.new_addresses  ?? "—")}
           ${statBlock("Source",           escHtml(data.source ?? data.cleanerType ?? "—"))}
         </div>
         <div class="result-download">
-          <span class="badge badge-gray">No download file generated</span>
+          ${downloadSection}
         </div>
       </div>`;
   }

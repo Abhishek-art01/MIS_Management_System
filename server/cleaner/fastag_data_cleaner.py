@@ -980,24 +980,26 @@ def process_fastag_data(file_data_list):
             # 🔥 THE FIX: Smarter Date Parser to prevent month/day flipping
             def safe_parse_date(val):
                 if pd.isna(val) or str(val).strip() in ["", "nan", "None", "NaT"]:
-                    return pd.NaT
+                    return "" # Return empty string instead of NaT
                 
                 val_str = str(val).strip()
                 
                 try:
                     # If a helper already formatted it as YYYY-MM-DD, parse it normally
                     if re.match(r"^\d{4}-\d{2}-\d{2}", val_str):
-                        return pd.to_datetime(val_str) # No dayfirst=True here!
+                        dt = pd.to_datetime(val_str) # No dayfirst=True here!
                     else:
                         # If it's a raw Indian format (DD-MM-YYYY), enforce dayfirst
-                        return pd.to_datetime(val_str, dayfirst=True)
+                        dt = pd.to_datetime(val_str, dayfirst=True)
+                    
+                    # Format the date right here, inside the function
+                    return dt.strftime('%d-%m-%Y %H:%M:%S')
                 except:
-                    return pd.NaT
+                    return ""
 
+            # Apply the function. It now directly returns perfectly formatted strings!
             final_df["Travel Date Time"] = final_df["Travel Date Time"].apply(safe_parse_date)
             
-            # Convert back to standard string format, leaving invalid dates blank
-            final_df["Travel Date Time"] = final_df["Travel Date Time"].dt.strftime('%d-%m-%Y %H:%M:%S').fillna("")
 
         final_df["Vehicle No"] = (
             final_df["Vehicle No"].astype(str)

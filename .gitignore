@@ -18,6 +18,7 @@ node_modules/
 # VS Code
 
 .vscode/
+venv/
 
 # System files
 
