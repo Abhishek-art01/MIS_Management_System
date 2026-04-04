@@ -30,9 +30,7 @@
         .tabs{display:flex;align-items:stretch;gap:2px;margin-left:4px;}
         .tab-btn{display:flex;align-items:center;gap:7px;padding:0 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);font-family:var(--font-main);font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;}
         .tab-btn:hover{color:var(--text);}
-        /* Updated tab accent = green */
         .tab-btn.active#tab-updated{color:var(--green);border-bottom-color:var(--green);}
-        /* Pending tab accent = yellow */
         .tab-btn.active#tab-pending{color:var(--yellow);border-bottom-color:var(--yellow);}
         .tab-count{font-family:var(--font-mono);font-size:.67rem;font-weight:700;padding:2px 7px;border-radius:20px;line-height:1.4;}
         #tab-updated.active .tab-count{background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.35);color:var(--green);}
@@ -174,7 +172,8 @@
         .time-edit-row{display:none;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px;padding:6px 8px;background:rgba(77,159,255,.05);border:1px dashed rgba(77,159,255,.25);border-radius:6px;}
         .time-edit-row.visible{display:flex;}
         .time-edit-label{font-size:.68rem;color:var(--accent);font-weight:700;font-family:var(--font-mono);min-width:50px;}
-        .time-edit-input{font-family:var(--font-mono);font-size:.78rem;background:var(--bg);border:1px solid var(--accent);color:var(--text);padding:4px 8px;border-radius:5px;outline:none;width:100px;}
+        /* Update this line in your CSS */
+        .time-edit-input{font-family:var(--font-mono);font-size:.78rem;background:var(--bg);border:1px solid var(--accent);color:var(--text);padding:4px 8px;border-radius:5px;outline:none;width:150px;}
         .time-edit-input.err{border-color:var(--accent2);}
         .btn-micro{padding:3px 8px;font-size:.68rem;border-radius:4px;border:none;cursor:pointer;font-family:var(--font-mono);font-weight:600;}
         .btn-micro-edit{background:rgba(77,159,255,.15);color:var(--accent);}
@@ -182,11 +181,41 @@
         .btn-micro-cancel{background:rgba(255,107,107,.12);color:var(--accent2);}
         .journey-row{display:flex;gap:6px;align-items:center;font-size:.74rem;flex-wrap:wrap;}
 
-        /* TOLL COLUMN */
+        /* TOLL COLUMN AND TIMELINE */
         .toll-options{flex:1.4;min-width:280px;padding:12px 14px;display:flex;flex-direction:column;gap:7px;}
         .tolls-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;}
         .tolls-title{font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-family:var(--font-mono);display:flex;align-items:center;gap:6px;}
         .tolls-count{background:rgba(176,138,255,.12);border:1px solid rgba(176,138,255,.25);color:var(--purple);padding:1px 7px;border-radius:10px;}
+
+        /* NEW TIMELINE STYLES */
+        .tolls-list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .timeline-marker {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin: 2px 0;
+            letter-spacing: 0.5px;
+        }
+        .timeline-pickup {
+            background: rgba(61,220,132,.08);
+            color: var(--green);
+            border: 1px dashed rgba(61,220,132,.3);
+        }
+        .timeline-drop {
+            background: rgba(255,107,107,.08);
+            color: var(--accent2);
+            border: 1px dashed rgba(255,107,107,.3);
+        }
 
         .toll-item{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;background:var(--bg);padding:9px 11px;border-radius:7px;border:1px solid var(--border);transition:all .15s;}
         .toll-item:hover{border-color:var(--accent);background:rgba(77,159,255,.04);}
@@ -236,17 +265,14 @@
 <body class="page-wrapper">
 <main class="main-content">
 
-<!-- TOPBAR -->
 <div class="topbar">
     <div class="topbar-left">
         <div class="topbar-brand"><i class="fa-solid fa-receipt" style="font-size:.8rem;"></i> TOLL AUDIT</div>
         <div class="tabs">
-            <!-- ★ UPDATED FIRST ★ -->
             <button class="tab-btn active" id="tab-updated" onclick="switchTab('updated')">
                 <i class="fa-solid fa-circle-check" style="font-size:.72rem;"></i> Updated
                 <span class="tab-count" id="count-updated">—</span>
             </button>
-            <!-- PENDING SECOND -->
             <button class="tab-btn" id="tab-pending" onclick="switchTab('pending')">
                 <i class="fa-solid fa-clock" style="font-size:.72rem;"></i> Pending
                 <span class="tab-count" id="count-pending">—</span>
@@ -259,7 +285,6 @@
     </div>
 </div>
 
-<!-- FILTER PANEL -->
 <div class="filter-panel" id="filter-panel" style="display:none;">
     <div class="filter-group">
         <label><i class="fa-regular fa-calendar" style="color:var(--yellow);"></i> Shift Date <span style="color:var(--accent2);font-size:.65rem;">*required</span></label>
@@ -338,7 +363,6 @@
     <div class="stat-item"><i class="fa-solid fa-clock" style="color:var(--purple);"></i> Gap: <strong id="stat-gap">—</strong></div>
 </div>
 
-<!-- ★ UPDATED PAGE FIRST ★ -->
 <div class="page active" id="page-updated">
     <div class="main-content" id="grid-updated">
         <div class="date-landing">
@@ -349,7 +373,6 @@
     </div>
 </div>
 
-<!-- PENDING PAGE SECOND -->
 <div class="page" id="page-pending">
     <div class="main-content" id="grid-pending">
         <div class="date-landing">
@@ -371,7 +394,7 @@
 // ══════════════════════════════════════════════════════
 let allMatches      = [];
 let filteredMatches = [];
-let currentTab      = 'updated'; // ★ default tab is now updated
+let currentTab      = 'updated'; 
 let isLoading       = false;
 let loadedDates     = [];
 let loadedGap       = null;
@@ -406,6 +429,18 @@ function tripRefMs(trip){
     if(date&&time) return parseMs(date+'T'+time+':00');
     return null;
 }
+
+// TIMELINE PARSER - Handles generic HH:mm alongside dates
+function parseEventTime(timeStr, baseDateStr) {
+    if (!timeStr || timeStr === '--:--' || timeStr.toLowerCase() === 'nan') return null;
+    if (timeStr.length > 6) { 
+        return parseMs(timeStr);
+    }
+    const date = normalizeDate(baseDateStr);
+    if (!date) return null;
+    return parseMs(date + 'T' + timeStr + ':00');
+}
+
 function tollMatchesGap(tollMs,refMs){
     if(!msState.gap.size) return true;
     if(tollMs===null||refMs===null) return true;
@@ -431,7 +466,6 @@ function deduplicateTollsByName(matches){
         const refMs=m._refMs;
         const groups=new Map();
         for(const t of m.tolls){
-            // ✅ FIX: Use toll_name instead of transaction_description
             const name=safeStr(t.toll_name||t.una_toll||'').trim().toUpperCase();
             if(!name){if(!groups.has('__noname__'))groups.set('__noname__',[]);groups.get('__noname__').push(t);continue;}
             if(!groups.has(name))groups.set(name,[]);
@@ -583,7 +617,7 @@ function clientFilter(){
             tolls=tolls.filter(tl=>tollMatchesGap(tl._tollMs,m._refMs));
             if(!tolls.length) return null;
         }
-        if(msState.toll.size>0&&!tolls.some(tl=>msState.toll.has(safeStr(tl.toll_name||tl.transaction_description).trim()))) return null;
+        if(msState.toll.size>0&&!tolls.some(tl=>msState.toll.has(safeStr(tl.toll_name||tl.una_toll).trim()))) return null;
         return{...m,tolls};
     }).filter(Boolean);
     renderGrids(filteredMatches);renderChips();
@@ -597,7 +631,6 @@ function populateSecondaryFilters(matches){
     msOptions.office   =[...new Set(matches.map(m=>safeStr(m.trip.office).trim()).filter(Boolean))].sort();
     msOptions.landmark =[...new Set(matches.map(m=>safeStr(m.trip.landmark).trim()).filter(Boolean))].sort();
     msOptions.cab      =[...new Set(matches.map(m=>safeStr(m.trip.cab_reg_no).trim()).filter(Boolean))].sort();
-    // ✅ FIX: Use toll_name
     msOptions.toll     =[...new Set(matches.flatMap(m=>m.tolls.map(t=>safeStr(t.toll_name||t.una_toll).trim())).filter(Boolean))].sort();
     msOptions.tripid   =[...new Set(matches.map(m=>safeStr(m.trip.trip_id||m.trip.unique_id).trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
     ['direction','office','landmark','cab','toll','tripid','gap'].forEach(k=>msRenderList(k,''));
@@ -640,7 +673,142 @@ function updateStats(matches){
 }
 
 // ══════════════════════════════════════════════════════
-//  RENDER GRIDS
+//  RENDER TOLL HTML BLOCK (Refactored for Timeline)
+// ══════════════════════════════════════════════════════
+function generateTollHTML(t, trip, tripUniqueId, isUpdated) {
+    const tId    = safeStr(t.id);
+    const desc   = safeStr(t.toll_name||t.una_toll||'—');
+    const dtDisp = safeStr(t.travel_date_time||'—');
+    const amount = parseFloat(t.amount||0).toLocaleString('en-IN',{maximumFractionDigits:2});
+    const matchCount = tollMatchCounts[tId]||1;
+    const nameTag = (t.toll_name||trip.toll_name)?`<span class="toll-name-tag"><i class="fa-solid fa-road"></i> ${t.toll_name||trip.toll_name}</span>`:'';
+    const isConfirmedRoute = (t._rule==='toll_route');
+    const confirmedBadge = isConfirmedRoute?`<span class="route-confirmed-badge"><i class="fa-solid fa-check-circle"></i> TOLL ROUTE</span>`:'';
+    const matchBadge = `<span class="toll-match-count ${matchCount===1?'single':''}" title="${matchCount===1?'Unique match':'Appears in '+matchCount+' trips'}"><i class="fa-solid fa-${matchCount===1?'check':'clone'}"></i> ${matchCount}×</span>`;
+
+    if(isUpdated){
+        return `<div class="toll-item-ro">
+            <div class="toll-details">
+                <div class="toll-datetime">${dtDisp}</div>
+                <div class="toll-desc">${desc}</div>
+                <div class="toll-meta-row">${nameTag}${confirmedBadge}${matchBadge}</div>
+            </div>
+            <div class="toll-amount toll-amount-updated">₹${amount}</div>
+        </div>`;
+    }
+
+    const descEsc    = desc.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const landmarkEsc= safeStr(trip.landmark).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const officeEsc  = safeStr(trip.office).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+    return `<div class="toll-item ${isConfirmedRoute?'is-confirmed-route selected':''}" id="toll-item-${tId}">
+        <div class="toll-middle" onclick="toggleTollSelect(this)">
+            <input type="checkbox" class="toll-checkbox-${tripUniqueId}" value="${tId}" ${isConfirmedRoute?'checked':''}>
+            <div class="toll-details">
+                <div class="toll-datetime">
+                    <span id="toll-time-display-${tId}">${dtDisp}</span>
+                    <button class="btn-tiny btn-edit-time" id="toll-time-edit-${tId}"
+                        onclick="event.stopPropagation();toggleTollTimeEdit('${tId}','edit','${tripUniqueId}')">
+                        <i class="fa-regular fa-pen-to-square"></i>
+                    </button>
+                    <button class="btn-tiny btn-save-time" id="toll-time-save-${tId}" style="display:none;"
+                        onclick="event.stopPropagation();toggleTollTimeEdit('${tId}','save','${tripUniqueId}')">✓</button>
+                    <button class="btn-tiny btn-cancel-time" id="toll-time-cancel-${tId}" style="display:none;"
+                        onclick="event.stopPropagation();toggleTollTimeEdit('${tId}','cancel','${tripUniqueId}')">✕</button>
+                </div>
+                <input type="text" class="toll-time-edit-input" id="toll-time-input-${tId}"
+                    onclick="event.stopPropagation();" placeholder="DD-MM-YYYY HH:MM:SS">
+                <div class="toll-desc">${desc}</div>
+                <div class="toll-meta-row">${nameTag}${confirmedBadge}${matchBadge}</div>
+            </div>
+            <div class="toll-amount toll-amount-pending">₹${amount}</div>
+        </div>
+        <div class="toll-right">
+            ${isConfirmedRoute?'':`<button class="btn-not-route" id="btn-not-route-${tId}" title="Save rule: this toll is NOT a route for this landmark/office"
+                onclick="event.stopPropagation();markNotTollRoute('${tId}','${tripUniqueId}','${descEsc}','${landmarkEsc}','${officeEsc}')">
+                <i class="fa-solid fa-xmark"></i><br>Not<br>Route
+            </button>`}
+        </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════
+//  TIMELINE RENDERER (Builds sorted right-side list)
+// ══════════════════════════════════════════════════════
+function renderTollsTimeline(tripId, isUpdated) {
+    const match = allMatches.find(m => safeStr(m.trip.unique_id) === tripId);
+    if (!match) return;
+
+    const trip = match.trip;
+    const tolls = match.tolls;
+    const container = document.getElementById(`tolls-list-${tripId}`);
+    if (!container) return;
+
+    // Save currently checked tolls so we don't clear user selection on re-render
+    const checkedIds = new Set(
+        Array.from(container.querySelectorAll(`input.toll-checkbox-${tripId}:checked`))
+             .map(cb => cb.value)
+    );
+
+    let events = [];
+
+    // Add Pickup Event
+    const puMs = parseEventTime(trip.pickup_time, trip.shift_date);
+    if (puMs) events.push({ type: 'pickup', time: puMs, timeStr: trip.pickup_time });
+
+    // Add Drop Event
+    const drMs = parseEventTime(trip.drop_time, trip.shift_date);
+    if (drMs) {
+        let finalDrMs = drMs;
+        // Overnight logic: If drop is earlier than pickup in hours, push to next day
+        if (puMs && drMs < puMs) {
+            finalDrMs += 24 * 60 * 60 * 1000; 
+        }
+        events.push({ type: 'drop', time: finalDrMs, timeStr: trip.drop_time });
+    }
+
+    // Add Toll Events
+    tolls.forEach(t => {
+        const tMs = parseMs(safeStr(t.travel_date_time));
+        events.push({ type: 'toll', time: tMs || 0, toll: t }); 
+    });
+
+    // SORT BY TIME
+    events.sort((a, b) => a.time - b.time);
+
+    // GENERATE HTML
+    const html = events.map(ev => {
+        if (ev.type === 'pickup') {
+            return `<div class="timeline-marker timeline-pickup">
+                        <div class="time-dot pickup"></div>
+                        <span>PICKUP — ${ev.timeStr}</span>
+                    </div>`;
+        }
+        if (ev.type === 'drop') {
+            return `<div class="timeline-marker timeline-drop">
+                        <div class="time-dot drop"></div>
+                        <span>DROP — ${ev.timeStr}</span>
+                    </div>`;
+        }
+        if (ev.type === 'toll') {
+            return generateTollHTML(ev.toll, trip, tripId, isUpdated);
+        }
+    }).join('');
+
+    container.innerHTML = html;
+
+    // Restore checked state
+    checkedIds.forEach(id => {
+        const cb = document.querySelector(`input.toll-checkbox-${tripId}[value="${id}"]`);
+        if (cb) {
+            cb.checked = true;
+            cb.closest('.toll-item')?.classList.add('selected');
+        }
+    });
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER GRIDS & CARDS
 // ══════════════════════════════════════════════════════
 function renderGrids(matches){
     const pending=matches.filter(m=>!isTollUpdated(m));
@@ -661,9 +829,6 @@ function renderGrids(matches){
     updateStats(matches);
 }
 
-// ══════════════════════════════════════════════════════
-//  RENDER CARD
-// ══════════════════════════════════════════════════════
 function renderCard(data,container,isUpdated){
     const trip=data.trip,tolls=data.tolls;
     const tripUniqueId=safeStr(trip.unique_id);
@@ -704,65 +869,6 @@ function renderCard(data,container,isUpdated){
                 </div>`:''}
             </div>`).join('')}
         </div>`;
-
-    const tollsHtml=tolls.map(t=>{
-        const tId    =safeStr(t.id);
-        // ✅ FIX: Use toll_name
-        const desc   =safeStr(t.toll_name||t.una_toll||'—'); 
-        const dtDisp =safeStr(t.travel_date_time||'—');
-        const amount =parseFloat(t.amount||0).toLocaleString('en-IN',{maximumFractionDigits:2});
-        const matchCount=tollMatchCounts[tId]||1;
-        // ... rest of the map function stays the same ...
-        const nameTag=(t.toll_name||trip.toll_name)?`<span class="toll-name-tag"><i class="fa-solid fa-road"></i> ${t.toll_name||trip.toll_name}</span>`:'';
-        const isConfirmedRoute=(t._rule==='toll_route');
-        const confirmedBadge=isConfirmedRoute?`<span class="route-confirmed-badge"><i class="fa-solid fa-check-circle"></i> TOLL ROUTE</span>`:'';
-        const matchBadge=`<span class="toll-match-count ${matchCount===1?'single':''}" title="${matchCount===1?'Unique match':'Appears in '+matchCount+' trips'}"><i class="fa-solid fa-${matchCount===1?'check':'clone'}"></i> ${matchCount}×</span>`;
-
-        if(isUpdated){
-            return `<div class="toll-item-ro">
-                <div class="toll-details">
-                    <div class="toll-datetime">${dtDisp}</div>
-                    <div class="toll-desc">${desc}</div>
-                    <div class="toll-meta-row">${nameTag}${confirmedBadge}${matchBadge}</div>
-                </div>
-                <div class="toll-amount toll-amount-updated">₹${amount}</div>
-            </div>`;
-        }
-
-        const descEsc    =desc.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-        const landmarkEsc=landmark.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-        const officeEsc  =office.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-
-        return `<div class="toll-item ${isConfirmedRoute?'is-confirmed-route':''}" id="toll-item-${tId}">
-            <div class="toll-middle" onclick="toggleTollSelect(this)">
-                <input type="checkbox" class="toll-checkbox-${tripUniqueId}" value="${tId}" ${isConfirmedRoute?'checked':''}>
-                <div class="toll-details">
-                    <div class="toll-datetime">
-                        <span id="toll-time-display-${tId}">${dtDisp}</span>
-                        <button class="btn-tiny btn-edit-time" id="toll-time-edit-${tId}"
-                            onclick="event.stopPropagation();toggleTollTimeEdit('${tId}','edit')">
-                            <i class="fa-regular fa-pen-to-square"></i>
-                        </button>
-                        <button class="btn-tiny btn-save-time" id="toll-time-save-${tId}" style="display:none;"
-                            onclick="event.stopPropagation();toggleTollTimeEdit('${tId}','save')">✓</button>
-                        <button class="btn-tiny btn-cancel-time" id="toll-time-cancel-${tId}" style="display:none;"
-                            onclick="event.stopPropagation();toggleTollTimeEdit('${tId}','cancel')">✕</button>
-                    </div>
-                    <input type="text" class="toll-time-edit-input" id="toll-time-input-${tId}"
-                        onclick="event.stopPropagation();" placeholder="DD-MM-YYYY HH:MM:SS">
-                    <div class="toll-desc">${desc}</div>
-                    <div class="toll-meta-row">${nameTag}${confirmedBadge}${matchBadge}</div>
-                </div>
-                <div class="toll-amount toll-amount-pending">₹${amount}</div>
-            </div>
-            <div class="toll-right">
-                ${isConfirmedRoute?'':`<button class="btn-not-route" id="btn-not-route-${tId}" title="Save rule: this toll is NOT a route for this landmark/office"
-                    onclick="markNotTollRoute('${tId}','${tripUniqueId}','${descEsc}','${landmarkEsc}','${officeEsc}')">
-                    <i class="fa-solid fa-xmark"></i><br>Not<br>Route
-                </button>`}
-            </div>
-        </div>`;
-    }).join('');
 
     const card=document.createElement('div');
     card.className='mapping-card'+(isUpdated?' is-updated':'');
@@ -811,9 +917,9 @@ function renderCard(data,container,isUpdated){
                 </div>
                 <div class="time-edit-row" id="time-edit-row-${tripUniqueId}">
                     <span class="time-edit-label" style="color:#3ddc84;">Pickup</span>
-                    <input type="time" class="time-edit-input" id="pu-input-${tripUniqueId}" step="60">
+                    <input type="text" class="time-edit-input" id="pu-input-${tripUniqueId}" placeholder="DD-MM-YYYY HH:MM">
                     <span class="time-edit-label" style="color:#ff6b6b;margin-left:8px;">Drop</span>
-                    <input type="time" class="time-edit-input" id="dr-input-${tripUniqueId}" step="60">
+                    <input type="text" class="time-edit-input" id="dr-input-${tripUniqueId}" placeholder="DD-MM-YYYY HH:MM">
                 </div>
             </div>
             ${(trip.journey_start_location||trip.journey_end_location)?`
@@ -832,7 +938,9 @@ function renderCard(data,container,isUpdated){
                 </div>
                 ${!isUpdated?`<span style="font-size:.68rem;color:var(--text-dim);">${loadedGap||''}</span>`:''}
             </div>
-            ${tollsHtml}
+            
+            <div class="tolls-list-container" id="tolls-list-${tripUniqueId}"></div>
+            
             ${isUpdated?`
             <div class="linked-total">
                 <i class="fa-solid fa-circle-check" style="color:var(--green);"></i>
@@ -846,7 +954,11 @@ function renderCard(data,container,isUpdated){
             <div class="btn-link-hint"><i class="fa-solid fa-info-circle"></i> Linking also auto-saves Toll Route rules</div>`}
         </div>
     </div>`;
+    
     container.appendChild(card);
+    
+    // Generate Timeline
+    renderTollsTimeline(tripUniqueId, isUpdated);
 }
 
 // ══════════════════════════════════════════════════════
@@ -881,60 +993,168 @@ async function markNotTollRoute(tollId,tripUniqueId,tollDesc,landmark,office){
 // ══════════════════════════════════════════════════════
 //  SAVE / LINK TOLLS
 // ══════════════════════════════════════════════════════
-async function saveTolls(tripUniqueId){
-    // ... (keep top part of function the same) ...
-    try{
-        const res=await fetch('/api/toll/mark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({trip_unique_id:tripUniqueId,selected_toll_ids:selectedTollIds})});
-        if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.detail||'Server error');}
-        if(match){
-            await Promise.all(selectedTollIds.map(tid=>{
-                const toll=match.tolls.find(t=>safeStr(t.id)===tid);
-                if(!toll) return Promise.resolve();
-                // ✅ FIX: Use toll_name
-                const tollName=safeStr(toll.toll_name||toll.una_toll||'');
-                if(!tollName) return Promise.resolve();
-                return fetch('/api/toll/route_rule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({landmark,office,toll_name:tollName,is_toll_route:true})}).catch(e=>console.warn(e));
+async function saveTolls(tripUniqueId) {
+    const checkboxes = document.querySelectorAll(`.toll-checkbox-${tripUniqueId}:checked`);
+    const selectedTollIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (!selectedTollIds.length) {
+        alert('Select at least one toll to link!');
+        return;
+    }
+
+    const btn = document.getElementById(`btn-link-${tripUniqueId}`);
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Linking…';
+    }
+
+    const cardEl = document.getElementById(`card-${tripUniqueId}`);
+    const landmark = cardEl ? cardEl.dataset.landmark : '';
+    const office   = cardEl ? cardEl.dataset.office : '';
+    const match    = allMatches.find(m => safeStr(m.trip.unique_id) === tripUniqueId);
+
+    try {
+        const res = await fetch('/api/toll/mark', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trip_unique_id: tripUniqueId, selected_toll_ids: selectedTollIds })
+        });
+        
+        if (!res.ok) {
+            const e = await res.json().catch(() => ({}));
+            throw new Error(e.detail || 'Server error');
+        }
+
+        if (match) {
+            await Promise.all(selectedTollIds.map(tid => {
+                const toll = match.tolls.find(t => safeStr(t.id) === tid);
+                if (!toll) return Promise.resolve();
+                
+                const tollName = safeStr(toll.toll_name || toll.una_toll || '');
+                if (!tollName) return Promise.resolve();
+                
+                return fetch('/api/toll/route_rule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ landmark, office, toll_name: tollName, is_toll_route: true })
+                }).catch(e => console.warn(e));
             }));
         }
-        // ... (keep bottom part of function the same) ...        const linkedSet=new Set(selectedTollIds);
-        for(const m of allMatches) m.tolls=m.tolls.filter(t=>!linkedSet.has(safeStr(t.id)));
-        tollMatchCounts=buildTollMatchCounts(allMatches);
-        for(const tid of selectedTollIds){
-            const el=document.getElementById(`toll-item-${tid}`);
-            if(el){el.style.transition='opacity .2s,transform .2s';el.style.opacity='0';el.style.transform='translateX(-12px)';setTimeout(()=>el.remove(),200);}
+
+        const linkedSet = new Set(selectedTollIds);
+        for (const m of allMatches) {
+            m.tolls = m.tolls.filter(t => !linkedSet.has(safeStr(t.id)));
         }
-        setTimeout(()=>{
-            const remaining=document.querySelectorAll(`.toll-checkbox-${tripUniqueId}`).length;
-            const countBadge=document.getElementById(`tolls-count-${tripUniqueId}`);
-            if(countBadge) countBadge.textContent=remaining;
+        
+        tollMatchCounts = buildTollMatchCounts(allMatches);
+        
+        for (const tid of selectedTollIds) {
+            const el = document.getElementById(`toll-item-${tid}`);
+            if (el) {
+                el.style.transition = 'opacity .2s,transform .2s';
+                el.style.opacity = '0';
+                el.style.transform = 'translateX(-12px)';
+                setTimeout(() => el.remove(), 200);
+            }
+        }
+
+        setTimeout(() => {
+            const remaining = document.querySelectorAll(`.toll-checkbox-${tripUniqueId}`).length;
+            const countBadge = document.getElementById(`tolls-count-${tripUniqueId}`);
+            if (countBadge) countBadge.textContent = remaining;
             updateStats(filteredMatches);
-        },220);
-        if(btn){btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-link"></i> Link Selected Tolls';}
-    } catch(e){
-        alert('Failed: '+e.message);
-        if(btn){btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-link"></i> Link Selected Tolls';}
+        }, 220);
+
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-link"></i> Link Selected Tolls';
+        }
+
+    } catch (e) {
+        alert('Failed: ' + e.message);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-link"></i> Link Selected Tolls';
+        }
     }
 }
 
 // ══════════════════════════════════════════════════════
-//  TIME EDIT
+//  TIME EDIT & AUTO-RESORT
 // ══════════════════════════════════════════════════════
-function toggleTimeEdit(tripId,mode){
+function toggleTimeEdit(tripId, mode) {
     const row=document.getElementById(`time-edit-row-${tripId}`);
     const bE=document.getElementById(`time-btn-edit-${tripId}`),bS=document.getElementById(`time-btn-save-${tripId}`),bC=document.getElementById(`time-btn-cancel-${tripId}`);
     const puD=document.getElementById(`pu-display-${tripId}`),drD=document.getElementById(`dr-display-${tripId}`);
     const puI=document.getElementById(`pu-input-${tripId}`),drI=document.getElementById(`dr-input-${tripId}`);
-    if(mode==='edit'){puI.value=puD.textContent.trim().replace('--:--','').slice(0,5);drI.value=drD.textContent.trim().replace('--:--','').slice(0,5);row.classList.add('visible');bE.style.display='none';bS.style.display=bC.style.display='inline-block';puI.focus();}
-    else if(mode==='save'){const re=/^\d{2}:\d{2}(:\d{2})?$/;let ok=true;if(puI.value&&!re.test(puI.value)){puI.classList.add('err');ok=false;}else puI.classList.remove('err');if(drI.value&&!re.test(drI.value)){drI.classList.add('err');ok=false;}else drI.classList.remove('err');if(!ok)return;puD.textContent=puI.value||'--:--';drD.textContent=drI.value||'--:--';row.classList.remove('visible');bE.style.display='inline-block';bS.style.display=bC.style.display='none';}
-    else{row.classList.remove('visible');bE.style.display='inline-block';bS.style.display=bC.style.display='none';}
+
+    if (mode === 'edit') {
+        // User requested: leave it empty on edit
+        puI.value = '';
+        drI.value = '';
+        
+        row.classList.add('visible');
+        bE.style.display = 'none';
+        bS.style.display = bC.style.display = 'inline-block';
+        puI.focus();
+    } else if (mode === 'save') {
+        // If they typed something, use it. If they left it blank, keep the old value.
+        puD.textContent = puI.value.trim() || puD.textContent;
+        drD.textContent = drI.value.trim() || drD.textContent;
+        
+        row.classList.remove('visible');
+        bE.style.display = 'inline-block';
+        bS.style.display = bC.style.display = 'none';
+
+        // UPDATE MODEL & RESORT
+        const match = allMatches.find(m => safeStr(m.trip.unique_id) === tripId);
+        if (match) {
+            match.trip.pickup_time = puD.textContent;
+            match.trip.drop_time = drD.textContent;
+        }
+        renderTollsTimeline(tripId, currentTab === 'updated');
+
+    } else {
+        row.classList.remove('visible');
+        bE.style.display = 'inline-block';
+        bS.style.display = bC.style.display = 'none';
+    }
 }
-function toggleTollTimeEdit(tollId,mode){
+
+function toggleTollTimeEdit(tollId, mode, tripId) {
     const disp=document.getElementById(`toll-time-display-${tollId}`),inp=document.getElementById(`toll-time-input-${tollId}`);
     const bE=document.getElementById(`toll-time-edit-${tollId}`),bS=document.getElementById(`toll-time-save-${tollId}`),bC=document.getElementById(`toll-time-cancel-${tollId}`);
-    if(mode==='edit'){inp.value=disp.textContent.trim();inp.classList.add('visible');disp.style.display='none';bE.style.display='none';bS.style.display=bC.style.display='inline-block';}
-    else if(mode==='save'){disp.textContent=inp.value.trim()||disp.textContent;inp.classList.remove('visible');disp.style.display='inline';bE.style.display='inline-block';bS.style.display=bC.style.display='none';}
-    else{inp.classList.remove('visible');disp.style.display='inline';bE.style.display='inline-block';bS.style.display=bC.style.display='none';}
+
+    if (mode === 'edit') {
+        inp.value = disp.textContent.trim();
+        inp.classList.add('visible');
+        disp.style.display = 'none';
+        bE.style.display = 'none';
+        bS.style.display = bC.style.display = 'inline-block';
+    } else if (mode === 'save') {
+        const newTime = inp.value.trim() || disp.textContent;
+        disp.textContent = newTime;
+        inp.classList.remove('visible');
+        disp.style.display = 'inline';
+        bE.style.display = 'inline-block';
+        bS.style.display = bC.style.display = 'none';
+
+        // UPDATE MODEL & RESORT
+        const match = allMatches.find(m => safeStr(m.trip.unique_id) === tripId);
+        if (match) {
+            const toll = match.tolls.find(t => safeStr(t.id) === tollId);
+            if (toll) toll.travel_date_time = newTime;
+        }
+        renderTollsTimeline(tripId, currentTab === 'updated');
+
+    } else {
+        inp.classList.remove('visible');
+        disp.style.display = 'inline';
+        bE.style.display = 'inline-block';
+        bS.style.display = bC.style.display = 'none';
+    }
 }
+
 function toggleTollSelect(el){
     const cb=el.querySelector('input[type="checkbox"]');
     if(cb){cb.checked=!cb.checked;const item=el.closest('.toll-item');if(item){cb.checked?item.classList.add('selected'):item.classList.remove('selected');}}
