@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request, File, UploadFile, Response, For
 
 # Internal Imports
 from database import get_session
-from models import ClientData, RawTripData, OperationData, TripData, TollData
+from models import ClientData, RawTripData, OperationTripData, AppTripData, TollData
 from cleaner.cleaner_helper import create_styled_excel
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent

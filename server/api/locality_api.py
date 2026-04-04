@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, col
 from database import get_session
-from models import TripData
+from models import AppTripData
 from datetime import datetime
 import os
 import io
@@ -27,7 +27,7 @@ from sqladmin.authentication import AuthenticationBackend
 # --- INTERNAL IMPORTS ---
 from auth import verify_password, get_password_hash
 from database import create_db_and_tables, get_session, engine
-from models import User, ClientData, RawTripData, OperationData, TripData, T3AddressLocality, T3LocalityZone, T3ZoneKm, BARowData
+from models import User, ClientData, RawTripData, OperationTripData, AppTripData, T3AddressLocality, T3LocalityZone, T3ZoneKm, BARowData
 from models import LocalityMappingSchema,BulkMappingSchema, NewMasterSchema
 
 

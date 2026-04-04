@@ -6,7 +6,8 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 from database import get_session
-from models import TripData, TollData, TollRouteRule
+# ✅ FIX: Import AppTripData instead of TripData
+from models import AppTripData, TollData, TollRouteRule
 
 router = APIRouter(prefix="/api/toll", tags=["Toll Audit"])
 
@@ -23,7 +24,7 @@ class MarkTollRequest(BaseModel):
 class TollRouteRuleRequest(BaseModel):
     landmark:      str
     office:        str
-    toll_name:     str      # transaction_description from TollData
+    toll_name:     str      # ✅ FIX: Updated comment to reflect new DB structure
     is_toll_route: bool     # True = toll route | False = NOT a toll route
 
 
@@ -74,7 +75,8 @@ def nk(s) -> str:
 
 @router.get("/available_dates")
 def get_available_dates(session: Session = Depends(get_session)):
-    all_trips = session.exec(select(TripData)).all()
+    # ✅ FIX: Use AppTripData
+    all_trips = session.exec(select(AppTripData)).all()
     if not all_trips:
         return []
     dates = set()
@@ -143,11 +145,6 @@ def save_route_rule(payload: TollRouteRuleRequest, session: Session = Depends(ge
 
 # ─────────────────────────────────────────────
 #  GET POTENTIAL MATCHES
-#  - shift_date  : single date (frontend fires parallel for multi-date)
-#  - time_gap_hours : ±window 1h-4h
-#  Rules applied:
-#    • (landmark, office, toll_name) in blocked_set → toll removed from results
-#    • Each remaining toll gets _rule: "toll_route" | null
 # ─────────────────────────────────────────────
 
 @router.get("/potential_matches")
@@ -174,7 +171,8 @@ def get_potential_tolls(
     print(f"[TollAudit] Rules → confirmed:{len(positive_set)}  blocked:{len(blocked_set)}")
 
     # ── 2. Trips for requested date ────────────────────────────────────
-    all_trips = session.exec(select(TripData)).all()
+    # ✅ FIX: Use AppTripData
+    all_trips = session.exec(select(AppTripData)).all()
     trips_for_date = [t for t in all_trips if str(t.shift_date or "").strip() == shift_date.strip()]
     if not trips_for_date:
         return []
@@ -243,7 +241,8 @@ def get_potential_tolls(
 
     # ── 9. Helper: tag toll with rule, or None if blocked ─────────────
     def tag_toll(td: dict, t_lm: str, t_ofc: str) -> Optional[dict]:
-        tn  = nk(str(td.get("transaction_description") or ""))
+        # ✅ FIX: Fetch from toll_name or una_toll instead of transaction_description
+        tn  = nk(str(td.get("toll_name") or td.get("una_toll") or ""))
         key = (t_lm, t_ofc, tn)
         if key in blocked_set:
             return None                                 # filtered out
@@ -308,8 +307,9 @@ def get_potential_tolls(
 
 @router.post("/mark")
 def mark_toll_trips(payload: MarkTollRequest, session: Session = Depends(get_session)):
+    # ✅ FIX: Use AppTripData
     trip = session.exec(
-        select(TripData).where(TripData.unique_id == payload.trip_unique_id)
+        select(AppTripData).where(AppTripData.unique_id == payload.trip_unique_id)
     ).first()
     if not trip:
         raise HTTPException(status_code=404, detail=f"Trip not found: {payload.trip_unique_id}")
@@ -329,13 +329,20 @@ def mark_toll_trips(payload: MarkTollRequest, session: Session = Depends(get_ses
         if toll:
             toll.unique_id   = trip.unique_id
             total_amount    += float(toll.amount or 0)
-            toll_names.append(str(toll.transaction_description or "Unknown Toll"))
+            
+            # ✅ FIX: Check new columns
+            t_name = toll.toll_name or toll.una_toll or "Unknown Toll"
+            toll_names.append(str(t_name))
+            
             session.add(toll)
         else:
             print(f"[TollAudit] WARNING: Toll id={toll_id_str} not found.")
 
     trip.unique_toll_id = ",".join(payload.selected_toll_ids)
-    trip.toll_amount    = total_amount
+    
+    # ✅ FIX: Cast total_amount back to string, since you changed toll_amount in TripDataBase to str
+    trip.toll_amount    = str(total_amount) 
+    
     trip.toll_name      = " | ".join(toll_names)
 
     session.add(trip)

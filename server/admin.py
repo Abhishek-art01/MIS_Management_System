@@ -5,7 +5,19 @@ from sqlmodel import Session, select
 
 # Internal Imports
 from database import engine
-from models import User, TripData, ClientData, RawTripData, OperationData, T3AddressLocality
+# ✅ FIX: Imported the updated model names and added the new ones
+from models import (
+    User, 
+    AppTripData, 
+    ManualTripData, 
+    ClientData, 
+    RawTripData, 
+    OperationTripData,
+    BARowData,
+    T3AddressLocality,
+    TollData,
+    TollRouteRule
+)
 from auth import verify_password, get_password_hash
 from config import get_settings
 
@@ -44,17 +56,47 @@ class UserAdmin(ModelView, model=User):
             data["password_hash"] = hashed
 
 
-class TripDataAdmin(ModelView, model=TripData):
-    column_list = [TripData.shift_date, TripData.unique_id, TripData.employee_name]
+# ✅ FIX: Updated to AppTripData
+class AppTripDataAdmin(ModelView, model=AppTripData):
+    name = "App Trip Data"
+    column_list = [AppTripData.shift_date, AppTripData.unique_id, AppTripData.employee_name]
 
+# ✅ NEW: Added view for Manual Trip Data
+class ManualTripDataAdmin(ModelView, model=ManualTripData):
+    name = "Manual Trip Data"
+    column_list = [ManualTripData.shift_date, ManualTripData.unique_id, ManualTripData.employee_name]
+
+# ✅ NEW: Added view for Operation Trip Data
+class OperationTripDataAdmin(ModelView, model=OperationTripData):
+    name = "Operation Trip Data"
+    column_list = [OperationTripData.shift_date, OperationTripData.unique_id, OperationTripData.employee_name]
 
 class ClientDataAdmin(ModelView, model=ClientData):
+    name = "Client Data"
     column_list = [ClientData.id, ClientData.unique_id]
 
+class RawTripDataAdmin(ModelView, model=RawTripData):
+    name = "Raw Trip Data"
+    column_list = [RawTripData.id, RawTripData.unique_id]
+
+class BARowDataAdmin(ModelView, model=BARowData):
+    name = "BA Row Data"
+    column_list = [BARowData.id, BARowData.unique_id]
 
 class AddressLocalityAdmin(ModelView, model=T3AddressLocality):
     name = "Address Master"
     column_list = [T3AddressLocality.id, T3AddressLocality.address, T3AddressLocality.locality]
+
+# ✅ NEW: Added Toll Data Admin
+class TollDataAdmin(ModelView, model=TollData):
+    name = "Toll Data"
+    # Using the new toll_name / una_toll columns
+    column_list = [TollData.id, TollData.toll_name, TollData.una_toll, TollData.amount, TollData.travel_date_time]
+
+# ✅ NEW: Added Toll Route Rules Admin
+class TollRouteRuleAdmin(ModelView, model=TollRouteRule):
+    name = "Toll Route Rules"
+    column_list = [TollRouteRule.landmark, TollRouteRule.office, TollRouteRule.toll_name, TollRouteRule.is_toll_route]
 
 
 # --- 3. THE SETUP FUNCTION ---
@@ -71,8 +113,14 @@ def setup_admin(app):
 
     # Add Views
     admin.add_view(UserAdmin)
-    admin.add_view(TripDataAdmin)
+    admin.add_view(AppTripDataAdmin)
+    admin.add_view(ManualTripDataAdmin)
+    admin.add_view(OperationTripDataAdmin)
     admin.add_view(ClientDataAdmin)
+    admin.add_view(RawTripDataAdmin)
+    admin.add_view(BARowDataAdmin)
     admin.add_view(AddressLocalityAdmin)
+    admin.add_view(TollDataAdmin)
+    admin.add_view(TollRouteRuleAdmin)
 
     return admin

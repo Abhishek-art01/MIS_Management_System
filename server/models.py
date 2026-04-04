@@ -52,24 +52,23 @@ class TripDataBase(DynamicSQLModel):
     gps_remark: Optional[str] = None
     claim_status: Optional[str] = None
 
-    staff_count: Optional[int] = None
-    billable_count: Optional[int] = None
+    staff_count: Optional[str] = None
+    billable_count: Optional[str] = None
 
     one_side: Optional[str] = None
-    two_side: Optional[float] = None
-    club_km: Optional[float] = None
-    toll_km: Optional[float] = None
-    total_km: Optional[float] = None
+    two_side: Optional[str] = None
+    club_km: Optional[str] = None
+    toll_km: Optional[str] = None
+    total_km: Optional[str] = None
 
     unique_toll_id: Optional[str] = None
     unique_toll_trn_id: Optional[str] = None
     travel_date_time: Optional[str] = None
 
     toll_name: Optional[str] = None
-    toll_amount: Optional[float] = None
-    total_amount: Optional[float] = None
+    toll_amount: Optional[str] = None
+    total_amount: Optional[str] = None
 
-    b2b_deducted: Optional[float] = None
 
 class TripDataFile(DynamicSQLModel):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -100,37 +99,43 @@ class TripDataFile(DynamicSQLModel):
     clubbing_status: Optional[str] = None
     
 
-# --- 3. CLIENT DATA ---
+# --- 2. CLIENT DATA ---
 class ClientData(TripDataBase, table=True):
     __tablename__ = "clientdata"
     id: Optional[int] = Field(default=None, primary_key=True)
 
-# --- 4. RAW TRIP DATA ---
+# --- 3. RAW TRIP DATA ---
 class RawTripData(TripDataBase, table=True):
     __tablename__ = "rawtripdata"
     id: Optional[int] = Field(default=None, primary_key=True)
 
-# --- 5.OPERATION DATA ---
-class OperationData(TripDataFile, table=True):
+# --- 4. OPERATION DATA ---
+# ✅ FIX: Changed class name to OperationTripData
+class OperationTripData(TripDataBase, table=True): 
     __tablename__ = "operationtripdata"
     id: Optional[int] = Field(default=None, primary_key=True)
 
-# --- 5.trip Data ---
-class TripData(TripDataBase, table=True):
-    __tablename__ = "apptripdata"
-    id: Optional[int] = Field(default=None, primary_key=True)
-
-# --- 6. BA ROW DATA ---
+# --- 5. BA ROW DATA ---
 class BARowData(TripDataBase, table=True):
     __tablename__ = "barowdata"
     id: Optional[int] = Field(default=None, primary_key=True)
 
-# --- 7. ZONE & KM TABLES (CRITICAL FIXES HERE) ---
+# --- 6. APP TRIP DATA ---
+# ✅ FIX: Changed class name to AppTripData
+class AppTripData(TripDataBase, table=True): 
+    __tablename__ = "apptripdata"
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+# --- 7. MANUAL TRIP DATA ---
+# ✅ FIX: Changed class name to ManualTripData
+class ManualTripData(TripDataBase, table=True): 
+    __tablename__ = "manualtripdata"
+    id: Optional[int] = Field(default=None, primary_key=True)
+# --- 8. ZONE & KM TABLES ---
 class T3ZoneKm(DynamicSQLModel, table=True):
     __tablename__ = "t3_zone_km"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    # ✅ FIX 1: Added unique=True. Required because 'T3LocalityZone' references this column.
     zone: str = Field(index=True, unique=True) 
     km: str
 
@@ -138,7 +143,6 @@ class T3LocalityZone(DynamicSQLModel, table=True):
     __tablename__ = "t3_locality_zone"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    # ✅ FIX 2: Added unique=True. Required because 'T3AddressLocality' references this column.
     locality: str = Field(index=True, unique=True) 
     zone: Optional[str] = Field(default=None, foreign_key="t3_zone_km.zone")
 
@@ -207,18 +211,17 @@ class TollData(DynamicSQLModel, table=True):
 
     veh: Optional[str] = None
     owner_type: Optional[str] = None
-    date: Optional[str] = None
+    una_toll: Optional[str] = None
     travel_date_time: Optional[str] = None
     unique_transaction_id: Optional[str] = None
-    transaction_description: Optional[str] = None
+    toll_name : Optional[str] = None
     activity: Optional[str] = None
 
     amount: Optional[float] = None
 
-    toll_id: Optional[str] = None
     unique_id: Optional[str] = None
     remark: Optional[str] = None
-    toll_una: Optional[str] = None
+  
 
 class Toll_locality(DynamicSQLModel, table=True):
     __tablename__ = "toll_locality"
@@ -251,6 +254,7 @@ class NewMasterSchema(BaseModel):
 
 # --- Dynamic Column Management ---
 class DynamicColumnSchema(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     model_name: str
     column_name: str
     column_type: str

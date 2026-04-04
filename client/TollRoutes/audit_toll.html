@@ -431,7 +431,8 @@ function deduplicateTollsByName(matches){
         const refMs=m._refMs;
         const groups=new Map();
         for(const t of m.tolls){
-            const name=safeStr(t.transaction_description||t.toll_name||'').trim().toUpperCase();
+            // ✅ FIX: Use toll_name instead of transaction_description
+            const name=safeStr(t.toll_name||t.una_toll||'').trim().toUpperCase();
             if(!name){if(!groups.has('__noname__'))groups.set('__noname__',[]);groups.get('__noname__').push(t);continue;}
             if(!groups.has(name))groups.set(name,[]);
             groups.get(name).push(t);
@@ -596,7 +597,8 @@ function populateSecondaryFilters(matches){
     msOptions.office   =[...new Set(matches.map(m=>safeStr(m.trip.office).trim()).filter(Boolean))].sort();
     msOptions.landmark =[...new Set(matches.map(m=>safeStr(m.trip.landmark).trim()).filter(Boolean))].sort();
     msOptions.cab      =[...new Set(matches.map(m=>safeStr(m.trip.cab_reg_no).trim()).filter(Boolean))].sort();
-    msOptions.toll     =[...new Set(matches.flatMap(m=>m.tolls.map(t=>safeStr(t.toll_name||t.transaction_description).trim())).filter(Boolean))].sort();
+    // ✅ FIX: Use toll_name
+    msOptions.toll     =[...new Set(matches.flatMap(m=>m.tolls.map(t=>safeStr(t.toll_name||t.una_toll).trim())).filter(Boolean))].sort();
     msOptions.tripid   =[...new Set(matches.map(m=>safeStr(m.trip.trip_id||m.trip.unique_id).trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
     ['direction','office','landmark','cab','toll','tripid','gap'].forEach(k=>msRenderList(k,''));
 }
@@ -705,10 +707,12 @@ function renderCard(data,container,isUpdated){
 
     const tollsHtml=tolls.map(t=>{
         const tId    =safeStr(t.id);
-        const desc   =safeStr(t.transaction_description||'—');
+        // ✅ FIX: Use toll_name
+        const desc   =safeStr(t.toll_name||t.una_toll||'—'); 
         const dtDisp =safeStr(t.travel_date_time||'—');
         const amount =parseFloat(t.amount||0).toLocaleString('en-IN',{maximumFractionDigits:2});
         const matchCount=tollMatchCounts[tId]||1;
+        // ... rest of the map function stays the same ...
         const nameTag=(t.toll_name||trip.toll_name)?`<span class="toll-name-tag"><i class="fa-solid fa-road"></i> ${t.toll_name||trip.toll_name}</span>`:'';
         const isConfirmedRoute=(t._rule==='toll_route');
         const confirmedBadge=isConfirmedRoute?`<span class="route-confirmed-badge"><i class="fa-solid fa-check-circle"></i> TOLL ROUTE</span>`:'';
@@ -878,15 +882,7 @@ async function markNotTollRoute(tollId,tripUniqueId,tollDesc,landmark,office){
 //  SAVE / LINK TOLLS
 // ══════════════════════════════════════════════════════
 async function saveTolls(tripUniqueId){
-    const checkboxes=document.querySelectorAll(`.toll-checkbox-${tripUniqueId}:checked`);
-    const selectedTollIds=Array.from(checkboxes).map(cb=>cb.value);
-    if(!selectedTollIds.length){alert('Select at least one toll to link!');return;}
-    const btn=document.getElementById(`btn-link-${tripUniqueId}`);
-    if(btn){btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Linking…';}
-    const cardEl=document.getElementById(`card-${tripUniqueId}`);
-    const landmark=cardEl?cardEl.dataset.landmark:'';
-    const office  =cardEl?cardEl.dataset.office  :'';
-    const match   =allMatches.find(m=>safeStr(m.trip.unique_id)===tripUniqueId);
+    // ... (keep top part of function the same) ...
     try{
         const res=await fetch('/api/toll/mark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({trip_unique_id:tripUniqueId,selected_toll_ids:selectedTollIds})});
         if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.detail||'Server error');}
@@ -894,12 +890,13 @@ async function saveTolls(tripUniqueId){
             await Promise.all(selectedTollIds.map(tid=>{
                 const toll=match.tolls.find(t=>safeStr(t.id)===tid);
                 if(!toll) return Promise.resolve();
-                const tollName=safeStr(toll.transaction_description||'');
+                // ✅ FIX: Use toll_name
+                const tollName=safeStr(toll.toll_name||toll.una_toll||'');
                 if(!tollName) return Promise.resolve();
                 return fetch('/api/toll/route_rule',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({landmark,office,toll_name:tollName,is_toll_route:true})}).catch(e=>console.warn(e));
             }));
         }
-        const linkedSet=new Set(selectedTollIds);
+        // ... (keep bottom part of function the same) ...        const linkedSet=new Set(selectedTollIds);
         for(const m of allMatches) m.tolls=m.tolls.filter(t=>!linkedSet.has(safeStr(t.id)));
         tollMatchCounts=buildTollMatchCounts(allMatches);
         for(const tid of selectedTollIds){

@@ -3,9 +3,12 @@ from sqlmodel import Session, select
 from pydantic import BaseModel
 from typing import Optional
 
+import pandas as pd
+
+
 # Internal Imports
 from database import get_session
-from models import TripData  # Assuming TripData is the model holding these fields
+from models import AppTripData,TollData  # Assuming TripData is the model holding these fields
 
 router = APIRouter(prefix="/api", tags=["GPS"])
 
@@ -75,14 +78,6 @@ Also add TollData to your imports if not already present:
     from models import TripData, TollData
 """
 
-import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
-from pydantic import BaseModel
-from typing import Optional
-
-from database import get_session
-from models import TripData, TollData
 
 
 # ── Paste this model alongside your existing ones ──
