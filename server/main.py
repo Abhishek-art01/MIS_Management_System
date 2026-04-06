@@ -58,6 +58,12 @@ async def lifespan(app: FastAPI):
                         " coalesce(max(id),0)+1, false) FROM t3_address_locality;"
                     )
                 )
+                s.exec(
+                    text(
+                        "SELECT setval(pg_get_serial_sequence('toll_route_rules','id'),"
+                        " coalesce(max(id),0)+1, false) FROM toll_route_rules;"
+                    )
+                )
                 s.commit()
         except Exception:
             pass
